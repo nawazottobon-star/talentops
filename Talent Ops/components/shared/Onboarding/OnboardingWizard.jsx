@@ -328,6 +328,18 @@ export default function OnboardingWizard() {
         agreedToTerms: false
     });
 
+    // Handle scroll lock for onboarding only
+    useEffect(() => {
+        document.body.classList.add('wizard-container-active');
+        document.documentElement.style.overflow = 'hidden';
+        
+        return () => {
+            document.body.classList.remove('wizard-container-active');
+            document.documentElement.style.overflow = 'auto';
+            document.body.style.overflow = 'auto';
+        };
+    }, []);
+
     const [selectedModules, setSelectedModules] = useState(['employees', 'attendance']);
     const [enabledFeatures, setEnabledFeatures] = useState(['self_service']);
     const [slugStatus, setSlugStatus] = useState(null); // null, 'checking', 'valid', 'invalid'
