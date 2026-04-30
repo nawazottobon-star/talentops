@@ -135,6 +135,7 @@ export const LoginPage = () => {
                         navigate('/executive-dashboard');
                         break;
                     case 'super_admin':
+                    case 'superadmin':
                         navigate('/super-admin');
                         break;
                     case 'manager':

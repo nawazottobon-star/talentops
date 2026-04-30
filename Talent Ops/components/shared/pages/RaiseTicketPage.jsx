@@ -8,15 +8,13 @@ import {
     Paperclip,
     X,
     Loader2,
-    Lightbulb,
     Bug,
     Clock,
-    MessageSquare,
     HelpCircle,
     Zap,
-    Shield,
+    MessageSquare,
     ChevronRight,
-    Eye
+    Shield
 } from 'lucide-react';
 import DocumentViewer from '../DocumentViewer';
 
@@ -24,14 +22,15 @@ const RaiseTicketPage = () => {
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState(false);
     const [files, setFiles] = useState([]);
-    const [ticketType, setTicketType] = useState('issue');
+    const [ticketType, setTicketType] = useState('bug'); // 'bug', 'feature', 'support'
     const [recentTickets, setRecentTickets] = useState([]);
     const [allTickets, setAllTickets] = useState([]);
     const [selectedTicket, setSelectedTicket] = useState(null);
+    const [ticketComments, setTicketComments] = useState([]);
+    const [newComment, setNewComment] = useState('');
     const [showTicketModal, setShowTicketModal] = useState(false);
-    const [reviewTab, setReviewTab] = useState('open_issues'); // 'open_issues', 'enhancements', 'closed'
-    const [refreshTrigger, setRefreshTrigger] = useState(0);
     const [userProfile, setUserProfile] = useState(null);
+    const [isAdmin, setIsAdmin] = useState(false);
 
     // Document Viewer state
     const [previewUrl, setPreviewUrl] = useState('');
@@ -39,26 +38,16 @@ const RaiseTicketPage = () => {
 
     const [formData, setFormData] = useState({
         subject: '',
-        category: 'it_support',
+        category: 'platform_bug',
         priority: 'medium',
         description: ''
     });
 
-    const issueCategories = [
-        { value: 'it_support', label: 'IT Support', icon: '💻' },
-        { value: 'hr_support', label: 'HR Support', icon: '👥' },
-        { value: 'operations', label: 'Operations', icon: '⚙️' },
-        { value: 'finance', label: 'Finance', icon: '💰' },
-        { value: 'facilities', label: 'Facilities', icon: '🏢' },
-        { value: 'other', label: 'Other', icon: '📋' }
-    ];
-
-    const enhancementCategories = [
-        { value: 'feature_request', label: 'New Feature', icon: '✨' },
-        { value: 'ux_improvement', label: 'UX/UI Improvement', icon: '🎨' },
-        { value: 'process_opt', label: 'Process Optimization', icon: '🔄' },
-        { value: 'new_tool', label: 'New Tool Request', icon: '🔧' },
-        { value: 'other', label: 'Other', icon: '💡' }
+    const categories = [
+        { value: 'platform_bug', label: 'Platform Bug', icon: <Bug size={18} />, desc: 'Report a technical issue' },
+        { value: 'feature_request', label: 'Feature Request', icon: <Zap size={18} />, desc: 'Suggest an improvement' },
+        { value: 'account_billing', label: 'Account & Billing', icon: <Shield size={18} />, desc: 'Payment or access issues' },
+        { value: 'tech_support', label: 'Technical Help', icon: <HelpCircle size={18} />, desc: 'General help using the app' }
     ];
 
     const priorities = [
@@ -67,100 +56,47 @@ const RaiseTicketPage = () => {
         { value: 'high', label: 'High', color: '#ef4444', bg: '#fef2f2' }
     ];
 
-    // Fetch user profile for role and org_id
     useEffect(() => {
         const fetchProfile = async () => {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
 
-            const { data, error } = await supabase
+            const { data } = await supabase
                 .from('profiles')
-                .select('role, org_id')
+                .select('role, org_id, full_name')
                 .eq('id', user.id)
                 .single();
 
-            if (data) setUserProfile(data);
+            if (data) {
+                setUserProfile(data);
+                const role = data.role?.toLowerCase();
+                setIsAdmin(role === 'superadmin');
+            }
         };
         fetchProfile();
     }, []);
 
-    // Fetch recent tickets
+    // Fetch tickets based on role
     useEffect(() => {
-        const fetchRecentTickets = async () => {
+        const fetchTickets = async () => {
             const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
+            if (!user || !userProfile) return;
 
-            const { data } = await supabase
-                .from('tickets')
-                .select('*')
-                .eq('user_id', user.id)
-                .order('created_at', { ascending: false })
-                .limit(3);
+            let query = supabase.from('tickets').select('*');
 
-            if (data) setRecentTickets(data);
-        };
-
-        fetchRecentTickets();
-    }, [success, refreshTrigger]);
-
-    // Fetch all tickets for review tab
-    useEffect(() => {
-        const fetchAllTickets = async () => {
-            if (ticketType !== 'review' || !userProfile) return;
-            setLoading(true);
-            try {
-                const { data: { user } } = await supabase.auth.getUser();
-                if (!user) return;
-
-                let query = supabase
-                    .from('tickets')
-                    .select('*')
-                    .order('created_at', { ascending: false });
-
-                // If executive or manager, show all tickets for the org
-                if (['executive', 'manager'].includes(userProfile.role?.toLowerCase())) {
-                    if (userProfile.org_id) {
-                        query = query.eq('org_id', userProfile.org_id);
-                    } else {
-                        query = query.eq('user_id', user.id);
-                    }
-                } else {
-                    query = query.eq('user_id', user.id);
-                }
-
-                const { data, error } = await query;
-
-                if (error) throw error;
-                if (data) setAllTickets(data);
-            } catch (error) {
-                console.error('Error fetching all tickets:', error);
-            } finally {
-                setLoading(false);
+            if (userProfile.role === 'superadmin') {
+                // SuperAdmin sees everything from all orgs
+                query = query.order('created_at', { ascending: false });
+            } else {
+                // Clients see only their own
+                query = query.eq('user_id', user.id).order('created_at', { ascending: false });
             }
+
+            const { data } = await query;
+            if (data) setAllTickets(data);
         };
-
-        fetchAllTickets();
-    }, [ticketType, refreshTrigger, userProfile]);
-
-    const handleCloseTicket = async (ticketId) => {
-        try {
-            const { error } = await supabase
-                .from('tickets')
-                .update({ status: 'resolved' }) // Using 'resolved' as the 'closed' equivalent based on getStatusColor
-                .eq('id', ticketId);
-
-            if (error) throw error;
-
-            setRefreshTrigger(prev => prev + 1);
-            if (selectedTicket && selectedTicket.id === ticketId) {
-                setSelectedTicket(prev => ({ ...prev, status: 'resolved' }));
-            }
-            alert('Ticket closed successfully');
-        } catch (error) {
-            console.error('Error closing ticket:', error);
-            alert('Failed to close ticket');
-        }
-    };
+        fetchTickets();
+    }, [userProfile, success, showTicketModal]);
 
     const handleFileChange = (e) => {
         if (e.target.files) {
@@ -178,867 +114,425 @@ const RaiseTicketPage = () => {
 
         try {
             const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error('User not found');
 
-            if (!user) {
-                alert('You must be logged in to submit a ticket.');
-                setLoading(false);
-                return;
-            }
-
-            // 1. Fetch user profile for org_id
-            const { data: profile, error: profileError } = await supabase
-                .from('profiles')
-                .select('org_id')
-                .eq('id', user.id)
-                .single();
-
-            if (profileError) {
-                console.error('Error fetching profile:', profileError);
-            }
-
-            // 2. Upload files to storage
+            // 1. Upload files if any
             const uploadedUrls = [];
             for (const file of files) {
                 const fileExt = file.name.split('.').pop();
-                const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
-                const filePath = `${user.id}/${fileName}`;
+                const fileName = `${Math.random()}.${fileExt}`;
+                const filePath = `support-tickets/${user.id}/${fileName}`;
 
-                const { data: uploadData, error: uploadError } = await supabase.storage
-                    .from('ticket-attachments') // Corrected bucket name
-                    .upload(filePath, file, {
-                        cacheControl: '3600',
-                        upsert: false
-                    });
+                const { error: uploadError } = await supabase.storage
+                    .from('ticket-attachments')
+                    .upload(filePath, file);
 
-                if (uploadError) {
-                    console.error('Upload error:', uploadError);
-                    continue;
-                }
+                if (uploadError) throw uploadError;
 
                 const { data: { publicUrl } } = supabase.storage
-                    .from('ticket-attachments') // Corrected bucket name
+                    .from('ticket-attachments')
                     .getPublicUrl(filePath);
 
                 if (publicUrl) uploadedUrls.push(publicUrl);
             }
 
-            {/* 3. Prepare payload and insert */ }
-            const payload = {
-                user_id: user.id,
-                org_id: profile?.org_id,
-                type: ticketType,
-                category: formData.category,
-                priority: formData.priority,
-                subject: formData.subject,
-                description: formData.description,
-                status: ticketType === 'issue' ? 'open' : 'proposed',
-                attachments: uploadedUrls
-            };
-
+            // 2. Insert ticket
             const { error } = await supabase
                 .from('tickets')
-                .insert([payload]);
+                .insert([{
+                    user_id: user.id,
+                    org_id: userProfile?.org_id,
+                    type: ticketType,
+                    category: formData.category,
+                    priority: formData.priority,
+                    subject: formData.subject,
+                    description: formData.description,
+                    status: 'open',
+                    attachments: uploadedUrls,
+                    metadata: {
+                        reporter_name: userProfile?.full_name,
+                        platform: 'TalentOps'
+                    }
+                }]);
 
             if (error) throw error;
 
             setSuccess(true);
             setFormData({
                 subject: '',
-                category: ticketType === 'issue' ? 'it_support' : 'feature_request',
+                category: 'platform_bug',
                 priority: 'medium',
                 description: ''
             });
             setFiles([]);
-
-            setTimeout(() => setSuccess(false), 4000);
+            setTimeout(() => setSuccess(false), 5000);
 
         } catch (error) {
-            console.error('Error submitting ticket:', error);
-            alert(`Failed to submit ticket: ${error.message}`);
+            console.error('Error submitting support ticket:', error);
+            alert(`Error: ${error.message}`);
         } finally {
             setLoading(false);
         }
     };
 
-    const toggleTicketType = (type) => {
-        setTicketType(type);
-        setFormData(prev => ({
-            ...prev,
-            category: type === 'issue' ? 'it_support' : 'feature_request'
-        }));
-    };
+    const handleAddComment = async (e) => {
+        e.preventDefault();
+        if (!newComment.trim() || !selectedTicket) return;
 
-    const getStatusColor = (status) => {
-        switch (status) {
-            case 'open': return { bg: '#fef3c7', color: '#d97706' };
-            case 'in_progress': return { bg: '#dbeafe', color: '#2563eb' };
-            case 'resolved': return { bg: '#dcfce7', color: '#16a34a' };
-            case 'proposed': return { bg: '#f3e8ff', color: '#9333ea' };
-            default: return { bg: '#f1f5f9', color: '#64748b' };
+        try {
+            const { error } = await supabase
+                .from('ticket_comments')
+                .insert([{
+                    ticket_id: selectedTicket.id,
+                    user_id: userProfile.id,
+                    comment: newComment
+                }]);
+
+            if (error) throw error;
+            setNewComment('');
+            fetchComments(selectedTicket.id);
+        } catch (error) {
+            console.error('Error adding comment:', error);
         }
     };
 
-    const quickActions = [
-        { icon: HelpCircle, label: 'FAQs', desc: 'Find quick answers', color: '#3b82f6' },
-        { icon: MessageSquare, label: 'Live Chat', desc: 'Talk to support', color: '#10b981' },
-        { icon: Clock, label: 'Status', desc: 'Track tickets', color: '#f59e0b' }
-    ];
+    const fetchComments = async (ticketId) => {
+        const { data } = await supabase
+            .from('ticket_comments')
+            .select('*, profiles(full_name, role)')
+            .eq('ticket_id', ticketId)
+            .order('created_at', { ascending: true });
+        
+        if (data) setTicketComments(data);
+    };
+
+    const handleResolveTicket = async (ticketId) => {
+        try {
+            const { error } = await supabase
+                .from('tickets')
+                .update({ status: 'resolved' })
+                .eq('id', ticketId);
+
+            if (error) throw error;
+            setShowTicketModal(false);
+            setSuccess(true);
+            setTimeout(() => setSuccess(false), 3000);
+        } catch (error) {
+            console.error('Error resolving ticket:', error);
+        }
+    };
+
+    const getStatusStyles = (status) => {
+        switch (status) {
+            case 'open': return { bg: '#eff6ff', color: '#3b82f6', label: 'Under Review' };
+            case 'in_progress': return { bg: '#fffbeb', color: '#d97706', label: 'Processing' };
+            case 'resolved': return { bg: '#f0fdf4', color: '#16a34a', label: 'Fixed' };
+            default: return { bg: '#f8fafc', color: '#64748b', label: 'Ticket Sent' };
+        }
+    };
 
     return (
-        <div style={{ minHeight: '100vh', background: '#f8fafc' }}>
-            {/* Compact Header Banner */}
-            <div style={{
-                background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
-                borderRadius: '8px',
-                padding: '20px 28px',
-                color: 'white',
-                position: 'relative',
-                overflow: 'hidden',
-                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
-                marginBottom: '24px'
-            }}>
-                <div style={{ position: 'relative', zIndex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-                    <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                            <span style={{ backgroundColor: 'rgba(255,255,255,0.1)', padding: '4px 10px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Dashboard</span>
-                            <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: '600' }}>/</span>
-                            <span style={{ color: '#22d3ee', fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase' }}>Support Center</span>
+        <>
+        <div style={{ minHeight: '100vh', background: '#f8fafc', padding: '32px' }}>
+            <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+                {/* Header */}
+                <div style={{ marginBottom: '32px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                        <div style={{ backgroundColor: '#0f172a', padding: '10px', borderRadius: '12px', color: 'white' }}>
+                            <HelpCircle size={24} />
                         </div>
-                        <h1 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '6px', letterSpacing: '-0.02em', lineHeight: 1.3 }}>
-                            {ticketType === 'issue' ? 'Report an Issue' : 'Propose Enhancement'}
-                        </h1>
-                        <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.85rem', fontWeight: '400' }}>
-                            {ticketType === 'issue'
-                                ? 'Submit a support request for bugs, errors, or operational issues.'
-                                : 'Have an idea? Suggest improvements or new features for the platform.'}
-                        </p>
-                    </div>
-
-                    <div style={{
-                        display: 'flex',
-                        gap: '12px',
-                        background: 'rgba(255, 255, 255, 0.05)',
-                        backdropFilter: 'blur(12px)',
-                        padding: '10px 14px',
-                        borderRadius: '8px',
-                        border: '1px solid rgba(255, 255, 255, 0.1)'
-                    }}>
-                        {quickActions.map((action, idx) => (
-                            <div key={idx} style={{
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                gap: '4px',
-                                padding: '8px 16px',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s',
-                                backgroundColor: 'rgba(255,255,255,0.05)'
-                            }}>
-                                <action.icon size={18} color={action.color} />
-                                <span style={{ fontSize: '0.7rem', fontWeight: '600', color: 'white' }}>{action.label}</span>
+                        <div>
+                            <h1 style={{ fontSize: '1.75rem', fontWeight: '800', color: '#0f172a', letterSpacing: '-0.02em' }}>
+                                {isAdmin ? 'TalentOps Support Dashboard' : 'TalentOps Support'}
+                            </h1>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <p style={{ color: '#64748b', fontSize: '0.95rem' }}>
+                                    {isAdmin ? 'Manage all incoming platform tickets and requests.' : 'Report issues or request platform features directly to the developers.'}
+                                </p>
+                                {userProfile && (
+                                    <span style={{ 
+                                        fontSize: '0.65rem', 
+                                        fontWeight: '800', 
+                                        backgroundColor: isAdmin ? '#0f172a' : '#f1f5f9', 
+                                        color: isAdmin ? 'white' : '#64748b', 
+                                        padding: '2px 8px', 
+                                        borderRadius: '4px',
+                                        textTransform: 'uppercase',
+                                        letterSpacing: '0.05em'
+                                    }}>
+                                        Role: {userProfile.role}
+                                    </span>
+                                )}
                             </div>
-                        ))}
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            {/* Main Content Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '24px' }}>
-                {/* Left Column - Form */}
-                <div>
-                    {/* Ticket Type Toggle */}
-                    <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', background: 'white', padding: '6px', borderRadius: '8px', border: '1px solid #e2e8f0', width: 'fit-content' }}>
-                        <button
-                            onClick={() => toggleTicketType('issue')}
-                            style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '8px',
-                                padding: '10px 20px',
-                                borderRadius: '6px',
-                                border: 'none',
-                                backgroundColor: ticketType === 'issue' ? '#0f172a' : 'transparent',
-                                color: ticketType === 'issue' ? 'white' : '#64748b',
-                                fontWeight: '600',
-                                fontSize: '0.85rem',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s'
-                            }}
-                        >
-                            <Bug size={16} />
-                            Raise Issue
-                        </button>
-                        <button
-                            onClick={() => toggleTicketType('enhancement')}
-                            style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '8px',
-                                padding: '10px 20px',
-                                borderRadius: '6px',
-                                border: 'none',
-                                backgroundColor: ticketType === 'enhancement' ? '#0f172a' : 'transparent',
-                                color: ticketType === 'enhancement' ? 'white' : '#64748b',
-                                fontWeight: '600',
-                                fontSize: '0.85rem',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s'
-                            }}
-                        >
-                            <Lightbulb size={16} />
-                            Enhancement
-                        </button>
-                        {['executive', 'manager'].includes(userProfile?.role?.toLowerCase()) && (
-                            <button
-                                onClick={() => toggleTicketType('review')}
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '8px',
-                                    padding: '10px 20px',
-                                    borderRadius: '6px',
-                                    border: 'none',
-                                    backgroundColor: ticketType === 'review' ? '#0f172a' : 'transparent',
-                                    color: ticketType === 'review' ? 'white' : '#64748b',
-                                    fontWeight: '600',
-                                    fontSize: '0.85rem',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s'
-                                }}
-                            >
-                                <Clock size={16} />
-                                Review Tickets
-                            </button>
-                        )}
-                    </div>
-
-                    {/* Form Card */}
-                    <div style={{
-                        backgroundColor: 'white',
-                        borderRadius: '8px',
-                        padding: '28px',
-                        border: '1px solid #e2e8f0',
-                        boxShadow: '0 2px 12px rgba(0,0,0,0.03)'
-                    }}>
-                        {success ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', textAlign: 'center' }}>
-                                <div style={{ width: '72px', height: '72px', background: 'linear-gradient(135deg, #10b981, #059669)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '20px', boxShadow: '0 10px 30px rgba(16, 185, 129, 0.3)' }}>
-                                    <CheckCircle2 size={36} color="white" />
-                                </div>
-                                <h3 style={{ fontSize: '1.4rem', fontWeight: '700', color: '#0f172a', marginBottom: '8px' }}>
-                                    {ticketType === 'issue' ? 'Issue Reported Successfully!' : ticketType === 'enhancement' ? 'Enhancement Proposed!' : 'Action Completed!'}
-                                </h3>
-                                <p style={{ color: '#64748b', fontSize: '0.95rem', marginBottom: '24px' }}>
-                                    Your {ticketType} has been recorded. Our team will review it shortly.
-                                </p>
-                                <button
-                                    onClick={() => setSuccess(false)}
-                                    style={{
-                                        padding: '12px 24px',
-                                        background: '#0f172a',
-                                        color: 'white',
-                                        borderRadius: '6px',
-                                        border: 'none',
-                                        fontWeight: '600',
-                                        cursor: 'pointer',
-                                        transition: 'all 0.2s'
-                                    }}
-                                >
-                                    Submit Another
-                                </button>
-                            </div>
-                        ) : ticketType === 'review' ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                {/* Review Sub-tabs */}
-                                <div style={{ display: 'flex', gap: '4px', backgroundColor: '#f1f5f9', padding: '4px', borderRadius: '8px', width: 'fit-content' }}>
-                                    {[
-                                        { id: 'open_issues', label: 'Open Issues' },
-                                        { id: 'enhancements', label: 'Enhancements' },
-                                        { id: 'closed', label: 'Closed' }
-                                    ].map(tab => (
-                                        <button
-                                            key={tab.id}
-                                            onClick={() => setReviewTab(tab.id)}
-                                            style={{
-                                                padding: '8px 16px',
-                                                borderRadius: '6px',
-                                                border: 'none',
-                                                backgroundColor: reviewTab === tab.id ? 'white' : 'transparent',
-                                                color: reviewTab === tab.id ? '#0f172a' : '#64748b',
-                                                fontWeight: '600',
-                                                fontSize: '0.85rem',
-                                                cursor: 'pointer',
-                                                boxShadow: reviewTab === tab.id ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                                                transition: 'all 0.2s'
-                                            }}
-                                        >
-                                            {tab.label}
-                                        </button>
+                {isAdmin ? (
+                    /* SUPERADMIN VIEW: LIST OF ALL TICKETS */
+                    <div style={{ backgroundColor: 'white', borderRadius: '24px', padding: '32px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', border: '1px solid #e2e8f0' }}>
+                        <h2 style={{ fontSize: '1.25rem', fontWeight: '700', marginBottom: '24px', color: '#0f172a' }}>All Platform Tickets</h2>
+                        <div style={{ overflowX: 'auto' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                <thead>
+                                    <tr style={{ borderBottom: '2px solid #f1f5f9', textAlign: 'left' }}>
+                                        <th style={{ padding: '16px', fontSize: '0.85rem', color: '#64748b' }}>STATUS</th>
+                                        <th style={{ padding: '16px', fontSize: '0.85rem', color: '#64748b' }}>TICKET</th>
+                                        <th style={{ padding: '16px', fontSize: '0.85rem', color: '#64748b' }}>CATEGORY</th>
+                                        <th style={{ padding: '16px', fontSize: '0.85rem', color: '#64748b' }}>SUBMITTED BY</th>
+                                        <th style={{ padding: '16px', fontSize: '0.85rem', color: '#64748b' }}>DATE</th>
+                                        <th style={{ padding: '16px', fontSize: '0.85rem', color: '#64748b' }}>ACTION</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {allTickets.map(ticket => (
+                                        <tr key={ticket.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                            <td style={{ padding: '16px' }}>
+                                                <span style={{ fontSize: '0.7rem', fontWeight: '700', color: getStatusStyles(ticket.status).color, background: getStatusStyles(ticket.status).bg, padding: '4px 8px', borderRadius: '6px' }}>
+                                                    {getStatusStyles(ticket.status).label}
+                                                </span>
+                                            </td>
+                                            <td style={{ padding: '16px', fontWeight: '600', color: '#0f172a' }}>{ticket.subject}</td>
+                                            <td style={{ padding: '16px', color: '#64748b', fontSize: '0.9rem', textTransform: 'capitalize' }}>{ticket.category.replace('_', ' ')}</td>
+                                            <td style={{ padding: '16px', color: '#0f172a', fontWeight: '500' }}>{ticket.metadata?.reporter_name || 'Anonymous'}</td>
+                                            <td style={{ padding: '16px', color: '#64748b', fontSize: '0.85rem' }}>{new Date(ticket.created_at).toLocaleDateString()}</td>
+                                            <td style={{ padding: '16px' }}>
+                                                <button 
+                                                    onClick={() => { setSelectedTicket(ticket); fetchComments(ticket.id); setShowTicketModal(true); }}
+                                                    style={{ padding: '8px 16px', backgroundColor: '#f1f5f9', border: 'none', borderRadius: '8px', color: '#0f172a', fontWeight: '600', cursor: 'pointer' }}
+                                                >
+                                                    View & Reply
+                                                </button>
+                                            </td>
+                                        </tr>
                                     ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                ) : (
+                    /* CLIENT VIEW: RAISE FORM & RECENT */
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '32px' }}>
+                    {/* Main Form */}
+                    <div style={{ backgroundColor: 'white', borderRadius: '24px', padding: '40px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', border: '1px solid #e2e8f0' }}>
+                        {success ? (
+                            <div style={{ textAlign: 'center', padding: '40px 0' }}>
+                                <div style={{ width: '80px', height: '80px', backgroundColor: '#dcfce7', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
+                                    <CheckCircle2 size={40} color="#16a34a" />
                                 </div>
-
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
-                                    <h3 style={{ fontSize: '1.1rem', fontWeight: '700', color: '#0f172a' }}>
-                                        {reviewTab === 'open_issues' ? 'Active Issues' : reviewTab === 'enhancements' ? 'Feature Requests' : 'Ticket History'}
-                                    </h3>
-                                    <button
-                                        onClick={() => setRefreshTrigger(prev => prev + 1)}
-                                        style={{ background: 'none', border: 'none', color: '#3b82f6', fontWeight: '600', cursor: 'pointer', fontSize: '0.85rem' }}
-                                    >
-                                        Refresh
-                                    </button>
-                                </div>
-
-                                {loading ? (
-                                    <div style={{ display: 'flex', justifyContent: 'center', padding: '40px' }}>
-                                        <Loader2 size={32} style={{ animation: 'spin 1s linear infinite' }} color="#3b82f6" />
-                                    </div>
-                                ) : (
-                                    (() => {
-                                        const filteredTickets = allTickets.filter(ticket => {
-                                            if (reviewTab === 'open_issues') return ticket.type === 'issue' && !['resolved', 'closed'].includes(ticket.status);
-                                            if (reviewTab === 'enhancements') return ticket.type === 'enhancement' && !['resolved', 'closed'].includes(ticket.status);
-                                            if (reviewTab === 'closed') return ['resolved', 'closed'].includes(ticket.status);
-                                            return true;
-                                        });
-
-                                        return filteredTickets.length > 0 ? (
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '600px', overflowY: 'auto' }}>
-                                                {filteredTickets.map((ticket) => {
-                                                    const statusStyle = getStatusColor(ticket.status);
-                                                    return (
-                                                        <div key={ticket.id} style={{
-                                                            padding: '20px',
-                                                            borderRadius: '8px',
-                                                            border: '1px solid #e2e8f0',
-                                                            backgroundColor: '#f8fafc',
-                                                            display: 'flex',
-                                                            justifyContent: 'space-between',
-                                                            alignItems: 'center',
-                                                            transition: 'all 0.2s'
-                                                        }}>
-                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                                    <span style={{
-                                                                        fontSize: '0.65rem',
-                                                                        fontWeight: '700',
-                                                                        padding: '4px 8px',
-                                                                        borderRadius: '6px',
-                                                                        backgroundColor: statusStyle.bg,
-                                                                        color: statusStyle.color,
-                                                                        textTransform: 'uppercase'
-                                                                    }}>{ticket.status?.replace('_', ' ')}</span>
-                                                                    <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>#{ticket.id.slice(0, 8)}</span>
-                                                                    {/* Show type badge if in closed tab to differentiate */}
-                                                                    {reviewTab === 'closed' && (
-                                                                        <span style={{
-                                                                            fontSize: '0.65rem',
-                                                                            fontWeight: '600',
-                                                                            padding: '2px 6px',
-                                                                            borderRadius: '4px',
-                                                                            backgroundColor: '#e2e8f0',
-                                                                            color: '#64748b',
-                                                                            textTransform: 'capitalize'
-                                                                        }}>
-                                                                            {ticket.type}
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                                <h4 style={{ fontSize: '1rem', fontWeight: '700', color: '#0f172a' }}>{ticket.subject}</h4>
-                                                                <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Submitted on {new Date(ticket.created_at).toLocaleDateString()}</span>
-                                                            </div>
-                                                            <button
-                                                                onClick={() => { setSelectedTicket(ticket); setShowTicketModal(true); }}
-                                                                style={{
-                                                                    display: 'flex',
-                                                                    alignItems: 'center',
-                                                                    gap: '8px',
-                                                                    padding: '10px 18px',
-                                                                    borderRadius: '6px',
-                                                                    border: '1px solid #e2e8f0',
-                                                                    backgroundColor: 'white',
-                                                                    color: '#0f172a',
-                                                                    fontWeight: '600',
-                                                                    fontSize: '0.85rem',
-                                                                    cursor: 'pointer',
-                                                                    transition: 'all 0.2s'
-                                                                }}
-                                                            >
-                                                                <Eye size={16} />
-                                                                View Details
-                                                            </button>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        ) : (
-                                            <div style={{ textAlign: 'center', padding: '60px 20px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px dashed #e2e8f0' }}>
-                                                <div style={{ width: '56px', height: '56px', backgroundColor: 'white', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-                                                    <Ticket size={24} color="#94a3b8" />
-                                                </div>
-                                                <p style={{ color: '#0f172a', fontWeight: '700', marginBottom: '4px' }}>No tickets found</p>
-                                                <p style={{ color: '#64748b', fontSize: '0.85rem' }}>
-                                                    {reviewTab === 'open_issues' ? 'No active issues at the moment.' :
-                                                        reviewTab === 'enhancements' ? 'No feature requests pending.' :
-                                                            'No closed tickets history.'}
-                                                </p>
-                                            </div>
-                                        );
-                                    })()
-                                )}
+                                <h2 style={{ fontSize: '1.5rem', fontWeight: '700', color: '#0f172a', marginBottom: '12px' }}>Ticket Received!</h2>
+                                <p style={{ color: '#64748b', marginBottom: '32px' }}>Our technical team has been notified. We will review your issue and get back to you shortly.</p>
+                                <button 
+                                    onClick={() => setSuccess(false)}
+                                    style={{ padding: '12px 24px', backgroundColor: '#0f172a', color: 'white', borderRadius: '12px', border: 'none', fontWeight: '600', cursor: 'pointer' }}
+                                >
+                                    Raise Another Issue
+                                </button>
                             </div>
                         ) : (
                             <form onSubmit={handleSubmit}>
-                                {/* Category Selection */}
-                                <div style={{ marginBottom: '24px' }}>
-                                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: '#374151', marginBottom: '10px' }}>Category</label>
-                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
-                                        {(ticketType === 'issue' ? issueCategories : enhancementCategories).map(cat => (
-                                            <button
+                                {/* Category Grid */}
+                                <div style={{ marginBottom: '32px' }}>
+                                    <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: '600', color: '#334155', marginBottom: '16px' }}>Issue Type</label>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+                                        {categories.map(cat => (
+                                            <div 
                                                 key={cat.value}
-                                                type="button"
                                                 onClick={() => setFormData({ ...formData, category: cat.value })}
                                                 style={{
-                                                    padding: '14px',
-                                                    borderRadius: '8px',
+                                                    padding: '16px',
+                                                    borderRadius: '16px',
                                                     border: formData.category === cat.value ? '2px solid #0f172a' : '1px solid #e2e8f0',
                                                     backgroundColor: formData.category === cat.value ? '#f8fafc' : 'white',
                                                     cursor: 'pointer',
-                                                    transition: 'all 0.2s',
-                                                    display: 'flex',
-                                                    flexDirection: 'column',
-                                                    alignItems: 'center',
-                                                    gap: '6px'
+                                                    transition: 'all 0.2s'
                                                 }}
                                             >
-                                                <span style={{ fontSize: '1.25rem' }}>{cat.icon}</span>
-                                                <span style={{ fontSize: '0.8rem', fontWeight: '600', color: formData.category === cat.value ? '#0f172a' : '#64748b' }}>{cat.label}</span>
-                                            </button>
+                                                <div style={{ color: formData.category === cat.value ? '#0f172a' : '#64748b', marginBottom: '8px' }}>{cat.icon}</div>
+                                                <div style={{ fontWeight: '700', fontSize: '0.9rem', color: '#0f172a', marginBottom: '4px' }}>{cat.label}</div>
+                                                <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{cat.desc}</div>
+                                            </div>
                                         ))}
                                     </div>
                                 </div>
 
-                                {/* Priority (only for issues) */}
-                                {ticketType === 'issue' && (
-                                    <div style={{ marginBottom: '24px' }}>
-                                        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: '#374151', marginBottom: '10px' }}>Priority</label>
-                                        <div style={{ display: 'flex', gap: '10px' }}>
-                                            {priorities.map(p => (
-                                                <button
-                                                    key={p.value}
-                                                    type="button"
-                                                    onClick={() => setFormData({ ...formData, priority: p.value })}
-                                                    style={{
-                                                        flex: 1,
-                                                        padding: '12px',
-                                                        borderRadius: '6px',
-                                                        border: formData.priority === p.value ? `2px solid ${p.color}` : '1px solid #e2e8f0',
-                                                        backgroundColor: formData.priority === p.value ? p.bg : 'white',
-                                                        cursor: 'pointer',
-                                                        transition: 'all 0.2s',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        gap: '8px'
-                                                    }}
-                                                >
-                                                    <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: p.color }}></div>
-                                                    <span style={{ fontSize: '0.85rem', fontWeight: '600', color: formData.priority === p.value ? p.color : '#64748b' }}>{p.label}</span>
-                                                </button>
-                                            ))}
-                                        </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 200px', gap: '20px', marginBottom: '24px' }}>
+                                    <div>
+                                        <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: '600', color: '#334155', marginBottom: '8px' }}>Subject</label>
+                                        <input 
+                                            type="text" 
+                                            required
+                                            value={formData.subject}
+                                            onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+                                            placeholder="Briefly describe the issue"
+                                            style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', outline: 'none' }}
+                                        />
                                     </div>
-                                )}
-
-                                {/* Subject */}
-                                <div style={{ marginBottom: '20px' }}>
-                                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>Subject</label>
-                                    <input
-                                        type="text"
-                                        required
-                                        value={formData.subject}
-                                        onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-                                        placeholder={ticketType === 'issue' ? 'Brief summary of the issue' : 'Title of your enhancement idea'}
-                                        style={{
-                                            width: '100%',
-                                            padding: '14px 16px',
-                                            borderRadius: '6px',
-                                            border: '1px solid #e2e8f0',
-                                            backgroundColor: '#f8fafc',
-                                            fontSize: '0.95rem',
-                                            outline: 'none',
-                                            transition: 'all 0.2s'
-                                        }}
-                                    />
+                                    <div>
+                                        <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: '600', color: '#334155', marginBottom: '8px' }}>Severity</label>
+                                        <select 
+                                            value={formData.priority}
+                                            onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+                                            style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', outline: 'none' }}
+                                        >
+                                            {priorities.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                                        </select>
+                                    </div>
                                 </div>
 
-                                {/* Description */}
-                                <div style={{ marginBottom: '20px' }}>
-                                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>Description</label>
-                                    <textarea
+                                <div style={{ marginBottom: '24px' }}>
+                                    <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: '600', color: '#334155', marginBottom: '8px' }}>Detailed Description</label>
+                                    <textarea 
+                                        rows="6"
                                         required
-                                        rows="5"
                                         value={formData.description}
                                         onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                        placeholder={ticketType === 'issue' ? 'Please describe the issue in detail...' : 'Describe the enhancement and its benefits...'}
-                                        style={{
-                                            width: '100%',
-                                            padding: '14px 16px',
-                                            borderRadius: '6px',
-                                            border: '1px solid #e2e8f0',
-                                            backgroundColor: '#f8fafc',
-                                            fontSize: '0.95rem',
-                                            outline: 'none',
-                                            resize: 'none',
-                                            transition: 'all 0.2s'
-                                        }}
+                                        placeholder="Please provide as much detail as possible. Steps to reproduce, expected vs actual behavior..."
+                                        style={{ width: '100%', padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0', outline: 'none', resize: 'none' }}
                                     />
                                 </div>
 
-                                {/* Attachments */}
-                                <div style={{ marginBottom: '24px' }}>
-                                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>Attachments (Optional)</label>
-                                    <div style={{
-                                        border: '2px dashed #e2e8f0',
-                                        borderRadius: '8px',
-                                        padding: '24px',
-                                        textAlign: 'center',
-                                        cursor: 'pointer',
-                                        transition: 'all 0.2s'
-                                    }}>
-                                        <input
-                                            type="file"
-                                            multiple
-                                            onChange={handleFileChange}
-                                            style={{ display: 'none' }}
-                                            id="file-upload"
-                                        />
-                                        <label htmlFor="file-upload" style={{ cursor: 'pointer' }}>
-                                            <div style={{ width: '48px', height: '48px', background: '#f1f5f9', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
-                                                <Paperclip size={22} color="#64748b" />
-                                            </div>
-                                            <p style={{ fontSize: '0.9rem', fontWeight: '600', color: '#374151', marginBottom: '4px' }}>Click to upload files</p>
-                                            <p style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Images, PDF, or Documents (Max 10MB)</p>
-                                        </label>
-                                    </div>
-
+                                <div style={{ marginBottom: '32px' }}>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '16px', border: '2px dashed #e2e8f0', borderRadius: '16px', cursor: 'pointer', justifyContent: 'center', color: '#64748b' }}>
+                                        <Paperclip size={18} />
+                                        <span style={{ fontWeight: '600' }}>Attach Screenshots or Logs</span>
+                                        <input type="file" multiple hidden onChange={handleFileChange} />
+                                    </label>
                                     {files.length > 0 && (
-                                        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '12px' }}>
-                                            {files.map((file, index) => (
-                                                <div key={index} style={{
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    gap: '8px',
-                                                    padding: '8px 12px',
-                                                    backgroundColor: '#f1f5f9',
-                                                    borderRadius: '8px',
-                                                    fontSize: '0.8rem',
-                                                    color: '#374151'
-                                                }}>
-                                                    <span>{file.name}</span>
-                                                    <button type="button" onClick={() => removeFile(index)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px' }}>
-                                                        <X size={14} color="#94a3b8" />
-                                                    </button>
+                                        <div style={{ marginTop: '12px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                            {files.map((f, i) => (
+                                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f1f5f9', padding: '4px 12px', borderRadius: '8px', fontSize: '0.8rem' }}>
+                                                    <span>{f.name}</span>
+                                                    <X size={14} style={{ cursor: 'pointer' }} onClick={() => removeFile(i)} />
                                                 </div>
                                             ))}
                                         </div>
                                     )}
                                 </div>
 
-                                {/* Submit Button */}
-                                <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', paddingTop: '16px', borderTop: '1px solid #f1f5f9' }}>
-                                    <button
-                                        type="button"
-                                        onClick={() => setFormData({ subject: '', category: ticketType === 'issue' ? 'it_support' : 'feature_request', priority: 'medium', description: '' })}
-                                        style={{
-                                            padding: '12px 24px',
-                                            borderRadius: '6px',
-                                            border: '1px solid #e2e8f0',
-                                            backgroundColor: 'white',
-                                            color: '#64748b',
-                                            fontWeight: '600',
-                                            fontSize: '0.9rem',
-                                            cursor: 'pointer',
-                                            transition: 'all 0.2s'
-                                        }}
-                                    >
-                                        Reset
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        disabled={loading}
-                                        style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '8px',
-                                            padding: '12px 28px',
-                                            borderRadius: '6px',
-                                            border: 'none',
-                                            background: ticketType === 'issue' ? 'linear-gradient(135deg, #ef4444, #dc2626)' : 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
-                                            color: 'white',
-                                            fontWeight: '600',
-                                            fontSize: '0.9rem',
-                                            cursor: 'pointer',
-                                            boxShadow: ticketType === 'issue' ? '0 4px 12px rgba(239, 68, 68, 0.3)' : '0 4px 12px rgba(139, 92, 246, 0.3)',
-                                            transition: 'all 0.2s',
-                                            opacity: loading ? 0.7 : 1
-                                        }}
-                                    >
-                                        {loading ? (
-                                            <>
-                                                <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
-                                                Submitting...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Send size={18} />
-                                                Submit {ticketType === 'issue' ? 'Ticket' : 'Proposal'}
-                                            </>
-                                        )}
-                                    </button>
-                                </div>
+                                <button 
+                                    type="submit" 
+                                    disabled={loading}
+                                    style={{ width: '100%', padding: '16px', backgroundColor: '#0f172a', color: 'white', borderRadius: '12px', border: 'none', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}
+                                >
+                                    {loading ? <Loader2 className="animate-spin" /> : <><Send size={18} /> Submit Issue to Developers</>}
+                                </button>
                             </form>
                         )}
                     </div>
-                </div>
 
-                {/* Right Column - Info & Recent Tickets */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                    {/* Quick Stats */}
-                    <div style={{
-                        backgroundColor: 'white',
-                        borderRadius: '16px',
-                        padding: '20px',
-                        border: '1px solid #e2e8f0',
-                        boxShadow: '0 2px 12px rgba(0,0,0,0.03)'
-                    }}>
-                        <h3 style={{ fontSize: '0.95rem', fontWeight: '700', color: '#0f172a', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <Shield size={18} color="#3b82f6" />
-                            Support Overview
-                        </h3>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', backgroundColor: '#f8fafc', borderRadius: '10px' }}>
-                                <span style={{ fontSize: '0.85rem', color: '#64748b' }}>Avg. Response Time</span>
-                                <span style={{ fontSize: '0.9rem', fontWeight: '700', color: '#0f172a' }}>~2 hours</span>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', backgroundColor: '#f8fafc', borderRadius: '10px' }}>
-                                <span style={{ fontSize: '0.85rem', color: '#64748b' }}>Resolution Rate</span>
-                                <span style={{ fontSize: '0.9rem', fontWeight: '700', color: '#10b981' }}>96%</span>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', backgroundColor: '#f8fafc', borderRadius: '10px' }}>
-                                <span style={{ fontSize: '0.85rem', color: '#64748b' }}>Active Tickets</span>
-                                <span style={{ fontSize: '0.9rem', fontWeight: '700', color: '#f59e0b' }}>{recentTickets.filter(t => t.status === 'open' || t.status === 'in_progress').length}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Recent Tickets */}
-                    <div style={{
-                        backgroundColor: 'white',
-                        borderRadius: '16px',
-                        padding: '20px',
-                        border: '1px solid #e2e8f0',
-                        boxShadow: '0 2px 12px rgba(0,0,0,0.03)'
-                    }}>
-                        <h3 style={{ fontSize: '0.95rem', fontWeight: '700', color: '#0f172a', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <Clock size={18} color="#f59e0b" />
-                            Recent Tickets
-                        </h3>
-                        {recentTickets.length > 0 ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                {recentTickets.map((ticket, idx) => {
-                                    const statusStyle = getStatusColor(ticket.status);
-                                    return (
-                                        <div key={idx} style={{
-                                            padding: '14px',
-                                            backgroundColor: '#f8fafc',
-                                            borderRadius: '12px',
-                                            cursor: 'pointer',
-                                            transition: 'all 0.2s'
-                                        }}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                                                <p style={{ fontSize: '0.85rem', fontWeight: '600', color: '#0f172a', flex: 1, lineHeight: 1.4 }}>{ticket.subject || 'No subject'}</p>
-                                                <ChevronRight size={16} color="#94a3b8" />
-                                            </div>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                <span style={{
-                                                    fontSize: '0.7rem',
-                                                    fontWeight: '600',
-                                                    padding: '3px 8px',
-                                                    borderRadius: '6px',
-                                                    backgroundColor: statusStyle.bg,
-                                                    color: statusStyle.color,
-                                                    textTransform: 'capitalize'
-                                                }}>
-                                                    {ticket.status?.replace('_', ' ')}
-                                                </span>
-                                                <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-                                                    {new Date(ticket.created_at).toLocaleDateString()}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        ) : (
-                            <div style={{ textAlign: 'center', padding: '24px' }}>
-                                <div style={{ width: '48px', height: '48px', backgroundColor: '#f1f5f9', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
-                                    <Ticket size={22} color="#94a3b8" />
-                                </div>
-                                <p style={{ fontSize: '0.85rem', color: '#94a3b8' }}>No tickets yet</p>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Tips Card */}
-                    <div style={{
-                        background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
-                        borderRadius: '16px',
-                        padding: '20px',
-                        color: 'white'
-                    }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
-                            <Zap size={18} color="#fbbf24" />
-                            <h3 style={{ fontSize: '0.95rem', fontWeight: '700' }}>Pro Tips</h3>
-                        </div>
-                        <ul style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.7)', lineHeight: 1.8, paddingLeft: '16px' }}>
-                            <li>Be specific about the issue</li>
-                            <li>Include steps to reproduce</li>
-                            <li>Attach relevant screenshots</li>
-                            <li>Mention urgency level</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-
-            {/* Ticket Detail Modal */}
-            {showTicketModal && selectedTicket && (
-                <div style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    backgroundColor: 'rgba(0,0,0,0.5)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 1000,
-                    backdropFilter: 'blur(4px)'
-                }}>
-                    <div style={{
-                        backgroundColor: 'white',
-                        borderRadius: '24px',
-                        width: '90%',
-                        maxWidth: '600px',
-                        maxHeight: '90vh',
-                        overflowY: 'auto',
-                        padding: '32px',
-                        position: 'relative',
-                        boxShadow: '0 20px 50px rgba(0,0,0,0.2)'
-                    }}>
-                        <button
-                            onClick={() => setShowTicketModal(false)}
-                            style={{ position: 'absolute', top: '24px', right: '24px', background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}
-                        >
-                            <X size={24} />
-                        </button>
-
-                        <div style={{ marginBottom: '24px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-                                <span style={{
-                                    fontSize: '0.75rem',
-                                    fontWeight: '700',
-                                    padding: '4px 12px',
-                                    borderRadius: '8px',
-                                    backgroundColor: getStatusColor(selectedTicket.status).bg,
-                                    color: getStatusColor(selectedTicket.status).color,
-                                    textTransform: 'uppercase'
-                                }}>{selectedTicket.status?.replace('_', ' ')}</span>
-                                <span style={{ fontSize: '0.9rem', color: '#94a3b8' }}>Ticket #{selectedTicket.id.slice(0, 8)}</span>
-                            </div>
-                            <h2 style={{ fontSize: '1.5rem', fontWeight: '800', color: '#0f172a', lineHeight: 1.3 }}>{selectedTicket.subject}</h2>
-                        </div>
-
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px', padding: '20px', backgroundColor: '#f8fafc', borderRadius: '16px' }}>
-                            <div>
-                                <p style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600', marginBottom: '4px', textTransform: 'uppercase' }}>Category</p>
-                                <p style={{ fontSize: '0.95rem', fontWeight: '700', color: '#0f172a', textTransform: 'capitalize' }}>{selectedTicket.category?.replace('_', ' ')}</p>
-                            </div>
-                            <div>
-                                <p style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600', marginBottom: '4px', textTransform: 'uppercase' }}>Priority</p>
-                                <p style={{ fontSize: '0.95rem', fontWeight: '700', color: selectedTicket.priority === 'high' ? '#ef4444' : '#0f172a', textTransform: 'capitalize' }}>{selectedTicket.priority}</p>
-                            </div>
-                            <div>
-                                <p style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600', marginBottom: '4px', textTransform: 'uppercase' }}>Submitted</p>
-                                <p style={{ fontSize: '0.95rem', fontWeight: '700', color: '#0f172a' }}>{new Date(selectedTicket.created_at).toLocaleString()}</p>
-                            </div>
-                            <div>
-                                <p style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600', marginBottom: '4px', textTransform: 'uppercase' }}>Type</p>
-                                <p style={{ fontSize: '0.95rem', fontWeight: '700', color: '#0f172a', textTransform: 'capitalize' }}>{selectedTicket.type}</p>
-                            </div>
-                        </div>
-
-                        <div style={{ marginBottom: '32px' }}>
-                            <p style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600', marginBottom: '12px', textTransform: 'uppercase' }}>Description</p>
-                            <div style={{ backgroundColor: '#f1f5f9', padding: '20px', borderRadius: '16px', fontSize: '0.95rem', color: '#334155', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
-                                {selectedTicket.description}
-                            </div>
-                        </div>
-
-                        {selectedTicket.attachments && selectedTicket.attachments.length > 0 && (
-                            <div style={{ marginBottom: '32px' }}>
-                                <p style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600', marginBottom: '12px', textTransform: 'uppercase' }}>Attachments</p>
-                                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                                    {selectedTicket.attachments.map((url, i) => (
+                    {/* Sidebar */}
+                    <div>
+                        <div style={{ backgroundColor: 'white', borderRadius: '24px', padding: '32px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', border: '1px solid #e2e8f0', marginBottom: '24px' }}>
+                            <h3 style={{ fontSize: '1.1rem', fontWeight: '700', color: '#0f172a', marginBottom: '20px' }}>Your Recent Tickets</h3>
+                            {allTickets.length > 0 ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                    {allTickets.slice(0, 5).map(ticket => (
                                         <div 
-                                            key={i} 
-                                            onClick={(e) => {
-                                                e.preventDefault();
-                                                setPreviewUrl(url);
-                                                setShowPreview(true);
-                                            }}
-                                            style={{ padding: '8px 16px', backgroundColor: '#f1f5f9', borderRadius: '8px', fontSize: '0.85rem', color: '#3b82f6', cursor: 'pointer', textDecoration: 'underline', fontWeight: '600' }}
+                                            key={ticket.id} 
+                                            onClick={() => { setSelectedTicket(ticket); fetchComments(ticket.id); setShowTicketModal(true); }}
+                                            style={{ padding: '16px', background: '#f8fafc', borderRadius: '16px', cursor: 'pointer', border: '1px solid transparent', transition: 'all 0.2s' }}
                                         >
-                                            View Attachment {i + 1}
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                                <span style={{ fontSize: '0.7rem', fontWeight: '700', color: getStatusStyles(ticket.status).color, textTransform: 'uppercase', background: getStatusStyles(ticket.status).bg, padding: '2px 8px', borderRadius: '4px' }}>
+                                                    {getStatusStyles(ticket.status).label}
+                                                </span>
+                                                <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>{new Date(ticket.created_at).toLocaleDateString()}</span>
+                                            </div>
+                                            <p style={{ fontSize: '0.85rem', fontWeight: '600', color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ticket.subject}</p>
                                         </div>
                                     ))}
                                 </div>
-                            </div>
-                        )}
-
-                        <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', paddingTop: '24px', borderTop: '1px solid #f1f5f9' }}>
-                            <button
-                                onClick={() => setShowTicketModal(false)}
-                                style={{ padding: '12px 24px', borderRadius: '12px', border: '1px solid #e2e8f0', backgroundColor: 'white', color: '#64748b', fontWeight: '600', cursor: 'pointer' }}
-                            >
-                                Close View
-                            </button>
-                            {selectedTicket.status !== 'resolved' && (
-                                <button
-                                    onClick={() => handleCloseTicket(selectedTicket.id)}
-                                    style={{ padding: '12px 24px', borderRadius: '12px', border: 'none', backgroundColor: '#ef4444', color: 'white', fontWeight: '600', cursor: 'pointer' }}
-                                >
-                                    Close Ticket
-                                </button>
+                            ) : (
+                                <p style={{ fontSize: '0.85rem', color: '#94a3b8', textAlign: 'center' }}>No recent support history.</p>
                             )}
+                        </div>
+
+
+                        <div style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', borderRadius: '24px', padding: '32px', color: 'white' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                                <Shield size={20} color="#22d3ee" />
+                                <h3 style={{ fontSize: '1rem', fontWeight: '700' }}>Developer Response</h3>
+                            </div>
+                            <p style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.7)', lineHeight: 1.6 }}>Our developers review all platform issues within 24-48 hours. Urgent bugs are prioritized immediately.</p>
                         </div>
                     </div>
                 </div>
             )}
-
-            {/* Document Preview Modal */}
-            {
-                showPreview && previewUrl && (
-                    <DocumentViewer
-                        url={previewUrl}
-                        fileName="Attachment"
-                        onClose={() => { setShowPreview(false); setPreviewUrl(''); }}
-                    />
-                )
-            }
         </div>
+    </div>
+
+        {/* Modal */}
+        {showTicketModal && selectedTicket && (
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' }}>
+                    <div style={{ backgroundColor: 'white', borderRadius: '24px', width: '90%', maxWidth: '600px', padding: '32px', position: 'relative' }}>
+                        <button onClick={() => setShowTicketModal(false)} style={{ position: 'absolute', top: '24px', right: '24px', background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}>
+                            <X size={24} />
+                        </button>
+                        <h2 style={{ fontSize: '1.5rem', fontWeight: '800', marginBottom: '24px' }}>Ticket Details</h2>
+                        <div style={{ padding: '20px', backgroundColor: '#f8fafc', borderRadius: '16px', marginBottom: '24px' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                                <div>
+                                    <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#64748b' }}>SUBJECT</label>
+                                    <p style={{ fontWeight: '700' }}>{selectedTicket.subject}</p>
+                                </div>
+                                <div>
+                                    <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#64748b' }}>STATUS</label>
+                                    <p style={{ fontWeight: '700', color: getStatusStyles(selectedTicket.status).color }}>{getStatusStyles(selectedTicket.status).label}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div style={{ marginBottom: '24px' }}>
+                            <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#64748b' }}>DESCRIPTION</label>
+                            <p style={{ marginTop: '8px', lineHeight: 1.6, fontSize: '0.95rem' }}>{selectedTicket.description}</p>
+                        </div>
+
+                        {/* Threaded Comments */}
+                        <div style={{ marginBottom: '24px', borderTop: '1px solid #f1f5f9', paddingTop: '24px' }}>
+                            <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#64748b', marginBottom: '16px', display: 'block' }}>CONVERSATION HISTORY</label>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '200px', overflowY: 'auto', paddingRight: '8px', marginBottom: '16px' }}>
+                                {ticketComments.length > 0 ? ticketComments.map(comment => (
+                                    <div key={comment.id} style={{ alignSelf: comment.profiles?.role === 'superadmin' ? 'flex-end' : 'flex-start', maxWidth: '80%', backgroundColor: comment.profiles?.role === 'superadmin' ? '#0f172a' : '#f1f5f9', color: comment.profiles?.role === 'superadmin' ? 'white' : '#1e293b', padding: '12px 16px', borderRadius: '16px', fontSize: '0.85rem' }}>
+                                        <div style={{ fontSize: '0.65rem', fontWeight: '700', marginBottom: '4px', opacity: 0.8 }}>{comment.profiles?.full_name} ({comment.profiles?.role})</div>
+                                        {comment.comment}
+                                    </div>
+                                )) : <p style={{ fontSize: '0.85rem', color: '#94a3b8', textAlign: 'center' }}>No comments yet.</p>}
+                            </div>
+
+                            {/* Add Comment Form */}
+                            <form onSubmit={handleAddComment} style={{ display: 'flex', gap: '8px' }}>
+                                <input 
+                                    type="text" 
+                                    value={newComment}
+                                    onChange={(e) => setNewComment(e.target.value)}
+                                    placeholder="Type your reply..."
+                                    style={{ flex: 1, padding: '10px 14px', borderRadius: '10px', border: '1px solid #e2e8f0', outline: 'none', fontSize: '0.85rem' }}
+                                />
+                                <button type="submit" style={{ padding: '10px 20px', backgroundColor: '#0f172a', color: 'white', borderRadius: '10px', border: 'none', cursor: 'pointer', fontWeight: '600' }}>Reply</button>
+                            </form>
+                        </div>
+
+                        {selectedTicket.attachments && selectedTicket.attachments.length > 0 && (
+                            <div style={{ marginBottom: '24px' }}>
+                                <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#64748b' }}>ATTACHMENTS</label>
+                                <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                                    {selectedTicket.attachments.map((url, i) => (
+                                        <a key={i} href={url} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.85rem', color: '#3b82f6', textDecoration: 'underline' }}>View #{i + 1}</a>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        <div style={{ display: 'flex', gap: '12px' }}>
+                            <button onClick={() => setShowTicketModal(false)} style={{ flex: 1, padding: '14px', backgroundColor: '#f1f5f9', color: '#0f172a', borderRadius: '12px', border: 'none', fontWeight: '600', cursor: 'pointer' }}>Close View</button>
+                            {isAdmin && selectedTicket.status !== 'resolved' && (
+                                <button onClick={() => handleResolveTicket(selectedTicket.id)} style={{ flex: 1, padding: '14px', backgroundColor: '#16a34a', color: 'white', borderRadius: '12px', border: 'none', fontWeight: '600', cursor: 'pointer' }}>Mark as Resolved</button>
+                            )}
+                        </div>
+
+                    </div>
+                </div>
+            )}
+        </>
     );
 };
 

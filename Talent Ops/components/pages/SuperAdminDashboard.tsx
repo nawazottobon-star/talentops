@@ -27,9 +27,17 @@ const SuperAdminDashboard = () => {
     const [selectedOrg, setSelectedOrg] = useState<any>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [pendingRequests, setPendingRequests] = useState<any[]>([]);
-    const [activeTab, setActiveTab] = useState<'tenants' | 'requests'>('requests');
+    const [tickets, setTickets] = useState<any[]>([]);
+    const [activeTab, setActiveTab] = useState<'tenants' | 'requests' | 'tickets'>('tickets');
     const [selectedRequest, setSelectedRequest] = useState<any>(null);
+    const [selectedTicket, setSelectedTicket] = useState<any>(null);
+    const [ticketComments, setTicketComments] = useState<any[]>([]);
+    const [newComment, setNewComment] = useState('');
     const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+    const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
+    const [authChecking, setAuthChecking] = useState(true);
+    const [authError, setAuthError] = useState<string | null>(null);
+    const [isSubmittingComment, setIsSubmittingComment] = useState(false);
     const [formData, setFormData] = useState({
         org_name: '',
         org_slug: '',
@@ -50,7 +58,38 @@ const SuperAdminDashboard = () => {
         document.documentElement.style.overflow = 'auto';
         document.documentElement.style.height = 'auto';
         
-        fetchData();
+        const checkSecurity = async () => {
+            try {
+                setAuthChecking(true);
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) {
+                    navigate('/login');
+                    return;
+                }
+
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('role')
+                    .eq('id', user.id)
+                    .single();
+
+                const role = profile.role?.toLowerCase();
+                if (!profile || (role !== 'superadmin' && role !== 'super_admin')) {
+                    setAuthError(profile?.role || 'No Role Assigned');
+                    setAuthChecking(false);
+                    return;
+                }
+
+                await fetchData();
+                setAuthChecking(false);
+            } catch (error) {
+                console.error('Security check error:', error);
+                setAuthError('Authentication Error');
+                setAuthChecking(false);
+            }
+        };
+
+        checkSecurity();
     }, []);
 
     const fetchData = async () => {
@@ -76,13 +115,22 @@ const SuperAdminDashboard = () => {
             if (requestsError) throw requestsError;
             setPendingRequests(requestsData);
 
+            // Fetch platform tickets
+            const { data: ticketsData, error: ticketsError } = await supabase
+                .from('tickets')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (ticketsError) throw ticketsError;
+            setTickets(ticketsData);
+
             const { count: orgCount } = await supabase.from('orgs').select('*', { count: 'exact', head: true });
             const { count: userCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
 
             setStats({
                 totalOrgs: orgCount || 0,
                 totalUsers: userCount || 0,
-                activeSystems: orgsData.filter(o => o.is_active).length
+                activeSystems: orgsData?.filter((o: any) => o.is_active).length || 0
             });
         } catch (error) {
             console.error('Error fetching admin data:', error);
@@ -192,8 +240,114 @@ const SuperAdminDashboard = () => {
         }
     };
 
+    const handleResolveTicket = async (ticketId: string) => {
+        try {
+            const { error } = await supabase
+                .from('tickets')
+                .update({ status: 'resolved' })
+                .eq('id', ticketId);
+
+            if (error) throw error;
+            fetchData();
+            // Keep modal open to show the "Close" option
+            const updatedTicket = tickets.find(t => t.id === ticketId);
+            if (updatedTicket) setSelectedTicket({...updatedTicket, status: 'resolved'});
+        } catch (error: any) {
+            console.error('Resolution error:', error);
+        }
+    };
+
+    const handleCloseTicket = async (ticketId: string) => {
+        try {
+            const { error } = await supabase
+                .from('tickets')
+                .update({ status: 'closed' })
+                .eq('id', ticketId);
+
+            if (error) throw error;
+            setIsTicketModalOpen(false);
+            fetchData();
+        } catch (error: any) {
+            console.error('Closing error:', error);
+        }
+    };
+
+    const handleAddComment = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newComment.trim() || !selectedTicket || isSubmittingComment) return;
+
+        try {
+            setIsSubmittingComment(true);
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error('User not found');
+
+            const { error } = await supabase
+                .from('ticket_comments')
+                .insert([{
+                    ticket_id: selectedTicket.id,
+                    user_id: user.id,
+                    comment: newComment
+                }]);
+
+            if (error) throw error;
+            setNewComment('');
+            await fetchComments(selectedTicket.id);
+        } catch (error: any) {
+            console.error('Comment error:', error);
+            alert('Failed to add comment: ' + (error.message || 'Check your permissions'));
+        } finally {
+            setIsSubmittingComment(false);
+        }
+    };
+
+    const fetchComments = async (ticketId: string) => {
+        const { data } = await supabase
+            .from('ticket_comments')
+            .select('*, profiles(full_name, role)')
+            .eq('ticket_id', ticketId)
+            .order('created_at', { ascending: true });
+        
+        if (data) setTicketComments(data);
+    };
+
+    if (authChecking) {
+        return (
+            <div className="min-h-screen bg-[#FDFBF7] flex flex-col items-center justify-center">
+                <Activity className="animate-spin text-orange-500 mb-4" size={40} />
+                <p className="text-slate-500 font-bold animate-pulse">Verifying Security Clearance...</p>
+            </div>
+        );
+    }
+
+    if (authError) {
+        return (
+            <div className="min-h-screen bg-[#FDFBF7] flex flex-col items-center justify-center p-8 text-center">
+                <div className="w-20 h-20 bg-rose-50 text-rose-600 rounded-[32px] flex items-center justify-center mb-8">
+                    <ShieldCheck size={40} />
+                </div>
+                <h1 className="text-3xl font-black text-slate-900 mb-4">Access Denied</h1>
+                <p className="text-slate-500 max-w-md mb-8">
+                    Your account is currently identified as <span className="text-rose-600 font-bold uppercase tracking-widest text-xs bg-rose-50 px-2 py-1 rounded-md">{authError}</span>. 
+                    This dashboard is restricted to the Platform SuperAdmin only.
+                </p>
+                <button 
+                    onClick={() => navigate('/login')}
+                    className="bg-slate-900 text-white px-10 py-4 rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-xl shadow-slate-200 cursor-pointer active:scale-95"
+                >
+                    Return to Login
+                </button>
+            </div>
+        );
+    }
+
     return (
-        <div className="h-screen bg-[#FDFBF7] p-8 overflow-y-auto">
+        <div className="min-h-screen bg-[#FDFBF7] p-8 overflow-y-auto relative">
+            {loading && (
+                <div className="fixed top-4 right-4 z-[100] bg-white/80 backdrop-blur-md border border-slate-100 px-4 py-2 rounded-full shadow-sm flex items-center gap-2">
+                    <Activity className="animate-spin text-orange-500" size={16} />
+                    <span className="text-xs font-bold text-slate-600">Syncing Data...</span>
+                </div>
+            )}
             <header className="flex justify-between items-center mb-12">
                 <div>
                     <h1 className="text-4xl font-black text-slate-900 tracking-tight mb-2">
@@ -203,7 +357,7 @@ const SuperAdminDashboard = () => {
                 </div>
                 <button
                     onClick={() => setIsModalOpen(true)}
-                    className="bg-slate-900 text-white px-8 py-4 rounded-2xl font-bold flex items-center gap-3 hover:scale-105 transition-all shadow-xl shadow-slate-200"
+                    className="bg-slate-900 text-white px-8 py-4 rounded-2xl font-bold flex items-center gap-3 hover:bg-slate-800 active:scale-95 transition-all shadow-xl shadow-slate-200 cursor-pointer"
                 >
                     <Plus size={20} /> Provision New Org
                 </button>
@@ -214,7 +368,7 @@ const SuperAdminDashboard = () => {
                     { label: 'Total Organizations', value: stats.totalOrgs, icon: Building2, color: 'text-blue-600', bg: 'bg-blue-50' },
                     { label: 'Platform Users', value: stats.totalUsers, icon: Users, color: 'text-orange-600', bg: 'bg-orange-50' },
                     { label: 'Active Systems', value: stats.activeSystems, icon: ShieldCheck, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-                    { label: 'Pending Requests', value: pendingRequests.length, icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50' }
+                    { label: 'Pending Tickets', value: tickets.filter(t => t.status === 'open').length, icon: AlertCircle, color: 'text-rose-600', bg: 'bg-rose-50' }
                 ].map((stat, i) => (
                     <div key={i} className="bg-white p-8 rounded-[32px] border border-slate-100 shadow-sm hover:shadow-md transition-all">
                         <div className={`w-14 h-14 ${stat.bg} ${stat.color} rounded-2xl flex items-center justify-center mb-6`}>
@@ -228,14 +382,20 @@ const SuperAdminDashboard = () => {
 
             <div className="flex gap-4 mb-8">
                 <button 
-                    onClick={() => setActiveTab('requests')}
-                    className={`px-6 py-3 rounded-xl font-bold transition-all ${activeTab === 'requests' ? 'bg-slate-900 text-white shadow-lg' : 'bg-white text-slate-500 border border-slate-100 hover:bg-slate-50'}`}
+                    onClick={() => setActiveTab('tickets')}
+                    className={`px-6 py-3 rounded-xl font-bold transition-all cursor-pointer active:scale-95 ${activeTab === 'tickets' ? 'bg-slate-900 text-white shadow-lg' : 'bg-white text-slate-500 border border-slate-100 hover:bg-slate-50'}`}
                 >
-                    Pending Requests ({pendingRequests.length})
+                    Support Tickets ({tickets.filter(t => t.status !== 'closed').length})
+                </button>
+                <button 
+                    onClick={() => setActiveTab('requests')}
+                    className={`px-6 py-3 rounded-xl font-bold transition-all cursor-pointer active:scale-95 ${activeTab === 'requests' ? 'bg-slate-900 text-white shadow-lg' : 'bg-white text-slate-500 border border-slate-100 hover:bg-slate-50'}`}
+                >
+                    Onboarding ({pendingRequests.length})
                 </button>
                 <button 
                     onClick={() => setActiveTab('tenants')}
-                    className={`px-6 py-3 rounded-xl font-bold transition-all ${activeTab === 'tenants' ? 'bg-slate-900 text-white shadow-lg' : 'bg-white text-slate-500 border border-slate-100 hover:bg-slate-50'}`}
+                    className={`px-6 py-3 rounded-xl font-bold transition-all cursor-pointer active:scale-95 ${activeTab === 'tenants' ? 'bg-slate-900 text-white shadow-lg' : 'bg-white text-slate-500 border border-slate-100 hover:bg-slate-50'}`}
                 >
                     Live Tenants ({orgs.length})
                 </button>
@@ -246,8 +406,10 @@ const SuperAdminDashboard = () => {
                     <h2 className="text-xl font-bold text-slate-900 flex items-center gap-3">
                         {activeTab === 'tenants' ? (
                             <><Activity className="text-orange-500" /> Live Tenants</>
-                        ) : (
+                        ) : activeTab === 'requests' ? (
                             <><Clock className="text-amber-500" /> Onboarding Requests</>
+                        ) : (
+                            <><AlertCircle className="text-rose-500" /> Support Tickets</>
                         )}
                     </h2>
                     <div className="flex gap-4">
@@ -317,8 +479,9 @@ const SuperAdminDashboard = () => {
                                 ))}
                             </tbody>
                         </table>
-                    ) : (
+                    ) : activeTab === 'requests' ? (
                         <table className="w-full text-left">
+                            {/* ... requests table headers ... */}
                             <thead>
                                 <tr className="border-b border-slate-100">
                                     <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Company Info</th>
@@ -351,9 +514,6 @@ const SuperAdminDashboard = () => {
                                                 <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-1 rounded-md">
                                                     {req.selected_modules?.length || 0} Modules
                                                 </span>
-                                                <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-1 rounded-md">
-                                                    {req.enabled_features?.length || 0} Features
-                                                </span>
                                             </div>
                                         </td>
                                         <td className="px-8 py-6">
@@ -367,25 +527,62 @@ const SuperAdminDashboard = () => {
                                                     setSelectedRequest(req);
                                                     setIsReviewModalOpen(true);
                                                 }}
-                                                className="bg-slate-900 text-white text-xs px-4 py-2 rounded-lg font-bold hover:bg-orange-600 transition-all flex items-center gap-2"
+                                                className="bg-slate-900 text-white text-xs px-4 py-2 rounded-lg font-bold hover:bg-orange-600 active:scale-95 transition-all flex items-center gap-2 cursor-pointer"
                                             >
                                                 Review Request <ArrowUpRight size={14} />
                                             </button>
                                         </td>
                                     </tr>
                                 ))}
-                                {pendingRequests.length === 0 && (
-                                    <tr>
-                                        <td colSpan={5} className="px-8 py-20 text-center">
-                                            <div className="flex flex-col items-center gap-4">
-                                                <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center text-slate-200">
-                                                    <Clock size={32} />
-                                                </div>
-                                                <p className="text-slate-400 font-medium">No pending onboarding requests.</p>
-                                            </div>
+                            </tbody>
+                        </table>
+                    ) : (
+                        /* TICKETS VIEW */
+                        <table className="w-full text-left">
+                            <thead>
+                                <tr className="border-b border-slate-100">
+                                    <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status</th>
+                                    <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Issue</th>
+                                    <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Reporter</th>
+                                    <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Category</th>
+                                    <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-50">
+                                {tickets.map((ticket) => (
+                                    <tr key={ticket.id} className="hover:bg-slate-50/50 transition-colors group">
+                                        <td className="px-8 py-6">
+                                            <span className={`text-[10px] font-black px-3 py-1 rounded-full ${
+                                                ticket.status === 'closed' ? 'bg-slate-100 text-slate-500' :
+                                                ticket.status === 'resolved' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'
+                                            }`}>
+                                                {ticket.status.toUpperCase()}
+                                            </span>
+                                        </td>
+                                        <td className="px-8 py-6">
+                                            <p className="font-bold text-slate-900">{ticket.subject}</p>
+                                            <p className="text-[10px] text-slate-400 font-medium">{new Date(ticket.created_at).toLocaleString()}</p>
+                                        </td>
+                                        <td className="px-8 py-6">
+                                            <p className="text-sm font-bold text-slate-900">{ticket.metadata?.reporter_name || 'System User'}</p>
+                                        </td>
+                                        <td className="px-8 py-6 text-sm text-slate-500 capitalize">
+                                            {ticket.category.replace('_', ' ')}
+                                        </td>
+                                        <td className="px-8 py-6">
+                                            <button 
+                                                onClick={() => {
+                                                    setSelectedTicket(ticket);
+                                                    fetchComments(ticket.id);
+                                                    setIsTicketModalOpen(true);
+                                                }}
+                                                className="bg-slate-100 text-slate-900 text-xs px-4 py-2 rounded-lg font-bold hover:bg-slate-900 hover:text-white active:scale-95 transition-all cursor-pointer"
+                                            >
+                                                Manage Ticket
+                                            </button>
                                         </td>
                                     </tr>
-                                )}
+                                ))}
                             </tbody>
                         </table>
                     )}
@@ -485,6 +682,94 @@ const SuperAdminDashboard = () => {
                                             </>
                                         )}
                                     </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Ticket Management Modal */}
+            {isTicketModalOpen && selectedTicket && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-[32px] w-full max-w-2xl overflow-hidden shadow-2xl border border-slate-100">
+                        <div className="p-10">
+                            <div className="flex justify-between items-start mb-8">
+                                <div>
+                                    <h2 className="text-2xl font-bold text-slate-900 mb-2">{selectedTicket.subject}</h2>
+                                    <p className="text-slate-500 text-sm">Platform Support Ticket from {selectedTicket.metadata?.reporter_name}</p>
+                                </div>
+                                <div className={`px-4 py-2 rounded-full text-xs font-bold ${
+                                    selectedTicket.status === 'resolved' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'
+                                }`}>
+                                    {selectedTicket.status.toUpperCase()}
+                                </div>
+                            </div>
+
+                            <div className="bg-slate-50 p-6 rounded-2xl mb-8 border border-slate-100">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Issue Description</label>
+                                <p className="text-slate-700 text-sm leading-relaxed">{selectedTicket.description}</p>
+                            </div>
+
+                            <div className="mb-8">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 block">Conversation History</label>
+                                <div className="space-y-4 max-h-[200px] overflow-y-auto pr-4 mb-6">
+                                    {ticketComments.length > 0 ? ticketComments.map((comment: any) => (
+                                        <div key={comment.id} className={`flex flex-col ${comment.profiles?.role === 'superadmin' ? 'items-end' : 'items-start'}`}>
+                                            <div className={`max-w-[80%] p-4 rounded-2xl text-sm ${
+                                                comment.profiles?.role === 'superadmin' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'
+                                            }`}>
+                                                <p className="text-[9px] font-black opacity-60 mb-1 uppercase tracking-tight">
+                                                    {comment.profiles?.full_name} ({comment.profiles?.role})
+                                                </p>
+                                                {comment.comment}
+                                            </div>
+                                        </div>
+                                    )) : (
+                                        <p className="text-center text-slate-400 text-xs py-4 italic">No conversation history yet.</p>
+                                    )}
+                                </div>
+
+                                <form onSubmit={handleAddComment} className="flex gap-3">
+                                    <input 
+                                        value={newComment}
+                                        onChange={(e) => setNewComment(e.target.value)}
+                                        placeholder="Type your official response..."
+                                        className="flex-1 bg-slate-50 border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-slate-900 shadow-sm"
+                                    />
+                                        <button 
+                                            type="submit" 
+                                            disabled={isSubmittingComment}
+                                            className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold hover:bg-slate-800 transition-all text-sm cursor-pointer active:scale-95 disabled:opacity-50"
+                                        >
+                                            {isSubmittingComment ? 'Adding...' : 'Add Comment'}
+                                        </button>
+                                </form>
+                            </div>
+
+                            <div className="flex gap-4 border-t border-slate-100 pt-8">
+                                <button
+                                    onClick={() => setIsTicketModalOpen(false)}
+                                    className="px-8 py-4 rounded-xl font-bold text-slate-500 hover:bg-slate-50 transition-all"
+                                >
+                                    Cancel
+                                </button>
+                                <div className="flex-1 flex justify-end gap-3">
+                                    {selectedTicket.status === 'open' && (
+                                        <button
+                                            onClick={() => handleResolveTicket(selectedTicket.id)}
+                                            className="bg-emerald-600 text-white px-8 py-4 rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 flex items-center gap-2 cursor-pointer active:scale-95"
+                                        >
+                                            <CheckCircle2 size={18} /> Mark as Resolved
+                                        </button>
+                                    )}
+                                    {selectedTicket.status === 'resolved' && (
+                                        <button
+                                            onClick={() => handleCloseTicket(selectedTicket.id)}
+                                            className="bg-slate-900 text-white px-8 py-4 rounded-xl font-bold hover:bg-red-600 transition-all shadow-lg shadow-slate-100 flex items-center gap-2 cursor-pointer active:scale-95"
+                                        >
+                                            <XCircle size={18} /> Close Ticket Permanently
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         </div>

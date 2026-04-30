@@ -340,8 +340,7 @@ export const sendMessage = async (conversationId, userId, content, files = [], o
                 sender_type: 'human',
                 message_type: 'chat',
                 content: content || '',
-                org_id: orgId,
-                created_at: new Date().toISOString()
+                org_id: orgId
             })
             .select()
             .single();
@@ -1023,8 +1022,7 @@ export const sendMessageWithReply = async (conversationId, content, senderId, re
                 reply_to: replyToId,
                 replied_message_content: repliedContent,
                 replied_message_sender_name: repliedSender,
-                org_id: orgId,
-                created_at: new Date().toISOString()
+                org_id: orgId
             }])
             .select()
             .single();
@@ -1268,7 +1266,7 @@ export const getReactionSummary = async (messageId) => {
  */
 export const sendPoll = async (conversationId, senderId, question, options, allowMultiple = false, orgId = null) => {
     try {
-        const { data, error } = await supabase.from('messages').insert([{ conversation_id: conversationId, sender_user_id: senderId, content: question, message_type: 'poll', is_poll: true, poll_question: question, poll_options: options, allow_multiple_answers: allowMultiple, org_id: orgId, created_at: new Date().toISOString() }]).select().single();
+        const { data, error } = await supabase.from('messages').insert([{ conversation_id: conversationId, sender_user_id: senderId, content: question, message_type: 'poll', is_poll: true, poll_question: question, poll_options: options, allow_multiple_answers: allowMultiple, org_id: orgId }]).select().single();
         if (error) throw error;
         await updateConversationIndex(conversationId, `📊 Poll: ${question}`);
         return data;
