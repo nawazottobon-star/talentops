@@ -26,8 +26,6 @@ const RaiseTicketPage = () => {
     const [recentTickets, setRecentTickets] = useState([]);
     const [allTickets, setAllTickets] = useState([]);
     const [selectedTicket, setSelectedTicket] = useState(null);
-    const [ticketComments, setTicketComments] = useState([]);
-    const [newComment, setNewComment] = useState('');
     const [showTicketModal, setShowTicketModal] = useState(false);
     const [userProfile, setUserProfile] = useState(null);
     const [isAdmin, setIsAdmin] = useState(false);
@@ -70,7 +68,7 @@ const RaiseTicketPage = () => {
             if (data) {
                 setUserProfile(data);
                 const role = data.role?.toLowerCase();
-                setIsAdmin(role === 'superadmin');
+                setIsAdmin(role === 'superadmin' || role === 'super_admin');
             }
         };
         fetchProfile();
@@ -84,7 +82,8 @@ const RaiseTicketPage = () => {
 
             let query = supabase.from('tickets').select('*');
 
-            if (userProfile.role === 'superadmin') {
+            const role = userProfile.role?.toLowerCase();
+            if (role === 'superadmin' || role === 'super_admin') {
                 // SuperAdmin sees everything from all orgs
                 query = query.order('created_at', { ascending: false });
             } else {
@@ -175,36 +174,9 @@ const RaiseTicketPage = () => {
         }
     };
 
-    const handleAddComment = async (e) => {
-        e.preventDefault();
-        if (!newComment.trim() || !selectedTicket) return;
+    // Removed handleAddComment as only SuperAdmin can comment via Dashboard
 
-        try {
-            const { error } = await supabase
-                .from('ticket_comments')
-                .insert([{
-                    ticket_id: selectedTicket.id,
-                    user_id: userProfile.id,
-                    comment: newComment
-                }]);
-
-            if (error) throw error;
-            setNewComment('');
-            fetchComments(selectedTicket.id);
-        } catch (error) {
-            console.error('Error adding comment:', error);
-        }
-    };
-
-    const fetchComments = async (ticketId) => {
-        const { data } = await supabase
-            .from('ticket_comments')
-            .select('*, profiles(full_name, role)')
-            .eq('ticket_id', ticketId)
-            .order('created_at', { ascending: true });
-        
-        if (data) setTicketComments(data);
-    };
+    // Removed fetchComments as we use admin_comment column directly
 
     const handleResolveTicket = async (ticketId) => {
         try {
@@ -297,11 +269,11 @@ const RaiseTicketPage = () => {
                                             <td style={{ padding: '16px', color: '#0f172a', fontWeight: '500' }}>{ticket.metadata?.reporter_name || 'Anonymous'}</td>
                                             <td style={{ padding: '16px', color: '#64748b', fontSize: '0.85rem' }}>{new Date(ticket.created_at).toLocaleDateString()}</td>
                                             <td style={{ padding: '16px' }}>
-                                                <button 
-                                                    onClick={() => { setSelectedTicket(ticket); fetchComments(ticket.id); setShowTicketModal(true); }}
+                                                 <button 
+                                                    onClick={() => { setSelectedTicket(ticket); setShowTicketModal(true); }}
                                                     style={{ padding: '8px 16px', backgroundColor: '#f1f5f9', border: 'none', borderRadius: '8px', color: '#0f172a', fontWeight: '600', cursor: 'pointer' }}
                                                 >
-                                                    View & Reply
+                                                    View Details
                                                 </button>
                                             </td>
                                         </tr>
@@ -487,30 +459,15 @@ const RaiseTicketPage = () => {
                             <p style={{ marginTop: '8px', lineHeight: 1.6, fontSize: '0.95rem' }}>{selectedTicket.description}</p>
                         </div>
 
-                        {/* Threaded Comments */}
-                        <div style={{ marginBottom: '24px', borderTop: '1px solid #f1f5f9', paddingTop: '24px' }}>
-                            <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#64748b', marginBottom: '16px', display: 'block' }}>CONVERSATION HISTORY</label>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '200px', overflowY: 'auto', paddingRight: '8px', marginBottom: '16px' }}>
-                                {ticketComments.length > 0 ? ticketComments.map(comment => (
-                                    <div key={comment.id} style={{ alignSelf: comment.profiles?.role === 'superadmin' ? 'flex-end' : 'flex-start', maxWidth: '80%', backgroundColor: comment.profiles?.role === 'superadmin' ? '#0f172a' : '#f1f5f9', color: comment.profiles?.role === 'superadmin' ? 'white' : '#1e293b', padding: '12px 16px', borderRadius: '16px', fontSize: '0.85rem' }}>
-                                        <div style={{ fontSize: '0.65rem', fontWeight: '700', marginBottom: '4px', opacity: 0.8 }}>{comment.profiles?.full_name} ({comment.profiles?.role})</div>
-                                        {comment.comment}
-                                    </div>
-                                )) : <p style={{ fontSize: '0.85rem', color: '#94a3b8', textAlign: 'center' }}>No comments yet.</p>}
+                        {/* Admin Resolution Note */}
+                        {selectedTicket.admin_comment && (
+                            <div style={{ marginBottom: '24px', borderTop: '1px solid #f1f5f9', paddingTop: '24px' }}>
+                                <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#64748b', marginBottom: '12px', display: 'block' }}>DEVELOPER RESOLUTION NOTE</label>
+                                <div style={{ backgroundColor: '#0f172a', color: 'white', padding: '16px', borderRadius: '16px', fontSize: '0.9rem', lineHeight: 1.6 }}>
+                                    {selectedTicket.admin_comment}
+                                </div>
                             </div>
-
-                            {/* Add Comment Form */}
-                            <form onSubmit={handleAddComment} style={{ display: 'flex', gap: '8px' }}>
-                                <input 
-                                    type="text" 
-                                    value={newComment}
-                                    onChange={(e) => setNewComment(e.target.value)}
-                                    placeholder="Type your reply..."
-                                    style={{ flex: 1, padding: '10px 14px', borderRadius: '10px', border: '1px solid #e2e8f0', outline: 'none', fontSize: '0.85rem' }}
-                                />
-                                <button type="submit" style={{ padding: '10px 20px', backgroundColor: '#0f172a', color: 'white', borderRadius: '10px', border: 'none', cursor: 'pointer', fontWeight: '600' }}>Reply</button>
-                            </form>
-                        </div>
+                        )}
 
                         {selectedTicket.attachments && selectedTicket.attachments.length > 0 && (
                             <div style={{ marginBottom: '24px' }}>
