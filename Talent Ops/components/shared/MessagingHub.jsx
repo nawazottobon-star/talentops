@@ -199,7 +199,16 @@ const MessagingHub = () => {
             // INSTANT SYNC: If the message belongs to the current chat window, fetch the messages
             const activeConv = selectedConversationRef.current;
             if (activeConv && activeConv.id === lastIncomingMessage.conversation_id) {
-                syncSelectedConversationMessages(activeConv.id);
+                // If the message is from current user, we already have it.
+                // If it's from someone else, we likely got it from onMessage realtime already.
+                // We only refetch if the current state doesn't have it to minimize jumping.
+                setMessages(prev => {
+                    const hasIt = prev.some(m => m.id === lastIncomingMessage.id);
+                    if (!hasIt) {
+                        syncSelectedConversationMessages(activeConv.id);
+                    }
+                    return prev;
+                });
                 markAsRead(activeConv.id);
             }
         }
@@ -311,7 +320,14 @@ const MessagingHub = () => {
                         if (fullMsg) {
                             setMessages(prev => {
                                 if (prev.some(msg => msg.id === fullMsg.id)) return prev;
-                                return [...prev, fullMsg];
+                                const newMessages = [...prev, fullMsg];
+                                // Sort by created_at then ID
+                                return newMessages.sort((a, b) => {
+                                    // Use string comparison for perfect microsecond precision
+                                    const timeCompare = (a.created_at || '').localeCompare(b.created_at || '');
+                                    if (timeCompare !== 0) return timeCompare;
+                                    return (a.id || '').localeCompare(b.id || '');
+                                });
                             });
                             setConversations(prevConvs => {
                                 const updated = prevConvs.map(c => {
@@ -601,7 +617,14 @@ const MessagingHub = () => {
 
 
             setReplyingTo(null);
-            setMessages(prev => [...prev, newMessage]);
+            setMessages(prev => {
+                const newMessages = [...prev, newMessage];
+                return newMessages.sort((a, b) => {
+                    const timeCompare = (a.created_at || '').localeCompare(b.created_at || '');
+                    if (timeCompare !== 0) return timeCompare;
+                    return (a.id || '').localeCompare(b.id || '');
+                });
+            });
 
             // Mark as read since we just sent a message in this conversation
             markAsRead(targetConversationId);

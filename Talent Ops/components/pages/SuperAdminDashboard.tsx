@@ -18,6 +18,7 @@ import {
     Briefcase
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { sendNotification } from '../../services/notificationService';
 
 const SuperAdminDashboard = () => {
     const navigate = useNavigate();
@@ -31,7 +32,7 @@ const SuperAdminDashboard = () => {
     const [activeTab, setActiveTab] = useState<'tenants' | 'requests' | 'tickets'>('tickets');
     const [selectedRequest, setSelectedRequest] = useState<any>(null);
     const [selectedTicket, setSelectedTicket] = useState<any>(null);
-    const [ticketComments, setTicketComments] = useState<any[]>([]);
+    const [adminComment, setAdminComment] = useState('');
     const [newComment, setNewComment] = useState('');
     const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
     const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
@@ -242,16 +243,32 @@ const SuperAdminDashboard = () => {
 
     const handleResolveTicket = async (ticketId: string) => {
         try {
+            const ticketToResolve = tickets.find(t => t.id === ticketId);
+            if (!ticketToResolve) return;
+
             const { error } = await supabase
                 .from('tickets')
                 .update({ status: 'resolved' })
                 .eq('id', ticketId);
 
             if (error) throw error;
+
+            // Send notification to the user who raised the ticket
+            const { data: { user: adminUser } } = await supabase.auth.getUser();
+            if (ticketToResolve.user_id && adminUser) {
+                await sendNotification(
+                    ticketToResolve.user_id,
+                    adminUser.id,
+                    'TalentOps Support',
+                    `Your ticket "${ticketToResolve.subject}" has been resolved.`,
+                    'support_ticket_resolved',
+                    ticketToResolve.org_id
+                );
+            }
+
             fetchData();
             // Keep modal open to show the "Close" option
-            const updatedTicket = tickets.find(t => t.id === ticketId);
-            if (updatedTicket) setSelectedTicket({...updatedTicket, status: 'resolved'});
+            setSelectedTicket({...ticketToResolve, status: 'resolved', admin_comment: adminComment});
         } catch (error: any) {
             console.error('Resolution error:', error);
         }
@@ -274,41 +291,28 @@ const SuperAdminDashboard = () => {
 
     const handleAddComment = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!newComment.trim() || !selectedTicket || isSubmittingComment) return;
+        if (!adminComment.trim() || !selectedTicket || isSubmittingComment) return;
 
         try {
             setIsSubmittingComment(true);
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) throw new Error('User not found');
-
+            
             const { error } = await supabase
-                .from('ticket_comments')
-                .insert([{
-                    ticket_id: selectedTicket.id,
-                    user_id: user.id,
-                    comment: newComment
-                }]);
+                .from('tickets')
+                .update({ admin_comment: adminComment })
+                .eq('id', selectedTicket.id);
 
             if (error) throw error;
-            setNewComment('');
-            await fetchComments(selectedTicket.id);
+            alert('Resolution note saved successfully.');
+            fetchData();
         } catch (error: any) {
             console.error('Comment error:', error);
-            alert('Failed to add comment: ' + (error.message || 'Check your permissions'));
+            alert('Failed to save resolution note: ' + (error.message || 'Check your permissions'));
         } finally {
             setIsSubmittingComment(false);
         }
     };
 
-    const fetchComments = async (ticketId: string) => {
-        const { data } = await supabase
-            .from('ticket_comments')
-            .select('*, profiles(full_name, role)')
-            .eq('ticket_id', ticketId)
-            .order('created_at', { ascending: true });
-        
-        if (data) setTicketComments(data);
-    };
+    // Removed fetchComments as we now use admin_comment column directly
 
     if (authChecking) {
         return (
@@ -572,9 +576,9 @@ const SuperAdminDashboard = () => {
                                         <td className="px-8 py-6">
                                             <button 
                                                 onClick={() => {
-                                                    setSelectedTicket(ticket);
-                                                    fetchComments(ticket.id);
-                                                    setIsTicketModalOpen(true);
+                                                     setSelectedTicket(ticket);
+                                                     setAdminComment(ticket.admin_comment || '');
+                                                     setIsTicketModalOpen(true);
                                                 }}
                                                 className="bg-slate-100 text-slate-900 text-xs px-4 py-2 rounded-lg font-bold hover:bg-slate-900 hover:text-white active:scale-95 transition-all cursor-pointer"
                                             >
@@ -709,42 +713,29 @@ const SuperAdminDashboard = () => {
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Issue Description</label>
                                 <p className="text-slate-700 text-sm leading-relaxed">{selectedTicket.description}</p>
                             </div>
-
-                            <div className="mb-8">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 block">Conversation History</label>
-                                <div className="space-y-4 max-h-[200px] overflow-y-auto pr-4 mb-6">
-                                    {ticketComments.length > 0 ? ticketComments.map((comment: any) => (
-                                        <div key={comment.id} className={`flex flex-col ${comment.profiles?.role === 'superadmin' ? 'items-end' : 'items-start'}`}>
-                                            <div className={`max-w-[80%] p-4 rounded-2xl text-sm ${
-                                                comment.profiles?.role === 'superadmin' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'
-                                            }`}>
-                                                <p className="text-[9px] font-black opacity-60 mb-1 uppercase tracking-tight">
-                                                    {comment.profiles?.full_name} ({comment.profiles?.role})
-                                                </p>
-                                                {comment.comment}
-                                            </div>
-                                        </div>
-                                    )) : (
-                                        <p className="text-center text-slate-400 text-xs py-4 italic">No conversation history yet.</p>
-                                    )}
-                                </div>
-
-                                <form onSubmit={handleAddComment} className="flex gap-3">
-                                    <input 
-                                        value={newComment}
-                                        onChange={(e) => setNewComment(e.target.value)}
-                                        placeholder="Type your official response..."
-                                        className="flex-1 bg-slate-50 border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-slate-900 shadow-sm"
+                             <div className="mb-8">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 block">Resolution Note (SuperAdmin Only)</label>
+                                
+                                <form onSubmit={handleAddComment} className="flex flex-col gap-3">
+                                    <textarea 
+                                        value={adminComment}
+                                        onChange={(e) => setAdminComment(e.target.value)}
+                                        disabled={selectedTicket.status === 'resolved' || selectedTicket.status === 'closed'}
+                                        placeholder={selectedTicket.status === 'resolved' || selectedTicket.status === 'closed' ? "Resolution note is locked." : "Provide the official resolution details here..."}
+                                        className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-slate-900 shadow-sm min-h-[100px] resize-none disabled:opacity-60"
                                     />
+                                    {selectedTicket.status !== 'resolved' && selectedTicket.status !== 'closed' && (
                                         <button 
                                             type="submit" 
-                                            disabled={isSubmittingComment}
-                                            className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold hover:bg-slate-800 transition-all text-sm cursor-pointer active:scale-95 disabled:opacity-50"
+                                            disabled={isSubmittingComment || !adminComment.trim()}
+                                            className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold hover:bg-slate-800 transition-all text-sm cursor-pointer active:scale-95 disabled:opacity-50 self-end"
                                         >
-                                            {isSubmittingComment ? 'Adding...' : 'Add Comment'}
+                                            {isSubmittingComment ? 'Saving...' : 'Save Resolution Note'}
                                         </button>
+                                    )}
                                 </form>
                             </div>
+
 
                             <div className="flex gap-4 border-t border-slate-100 pt-8">
                                 <button
