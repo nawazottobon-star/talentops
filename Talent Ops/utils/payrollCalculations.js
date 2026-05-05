@@ -80,47 +80,44 @@ export const calculateApprovedLeaveDays = async (employeeId, month, year, orgId)
             return 0;
         }
 
-        // 2. Fetch Employee Quota
-        const { data: profileData, error: profileError } = await supabase
-            .from('profiles')
-            .select('monthly_leave_quota')
-            .eq('id', employeeId)
-            .eq('org_id', orgId)
-            .single();
+        // 2. Process overlap with the target month
 
-        const monthlyQuota = (profileData && profileData.monthly_leave_quota) ? profileData.monthly_leave_quota : 1; // Default to 1 per user request
 
         if (!leavesData || leavesData.length === 0) return 0;
-
+ 
         let regularLeaveDays = 0;
-
+ 
         leavesData.forEach(leave => {
-            // Skip "Loss of Pay" leaves entirely - they are not "Paid Leaves"
-            if (leave.reason && leave.reason.toLowerCase().startsWith('loss of pay')) {
+            // Skip \"Loss of Pay\" leaves entirely
+            const type = (leave.leave_type || '').toLowerCase();
+            const reason = (leave.reason || '').toLowerCase();
+            if (type.includes('loss of pay') || reason.includes('loss of pay')) {
                 return;
             }
-            // "Casual", "Sick", "Vacation" count towards paid leave balance
-
+ 
             const leaveStart = new Date(leave.from_date);
             const leaveEnd = new Date(leave.to_date);
-
+ 
             // Find overlap between leave period and the month
             const overlapStart = leaveStart > startDate ? leaveStart : startDate;
             const overlapEnd = leaveEnd < endDate ? leaveEnd : endDate;
-
+ 
             // Only count if there's an overlap
             if (overlapStart <= overlapEnd) {
-                const diffTime = Math.abs(overlapEnd - overlapStart);
-                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 to include both start and end
-                regularLeaveDays += diffDays;
+                let current = new Date(overlapStart);
+                while (current <= overlapEnd) {
+                    const day = current.getDay();
+                    if (day !== 0 && day !== 6) { // Monday to Friday only
+                        regularLeaveDays++;
+                    }
+                    current.setDate(current.getDate() + 1);
+                }
             }
         });
+ 
+        // Return total regular leave days in the month (no monthly cap)
+        return regularLeaveDays;
 
-        // 3. Cap at Quota
-        // The number of "Paid Leave Days" cannot exceed the monthly quota.
-        // Any leaves taken beyond this will simply not be returned here, 
-        // causing them to fall into the "LOP = Total - Present - Paid" gap.
-        return Math.min(regularLeaveDays, monthlyQuota);
 
     } catch (error) {
         console.error('Error calculating leave days:', error);
