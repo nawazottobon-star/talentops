@@ -11,14 +11,16 @@ const MyLeavesPage = () => {
     const [remainingLeaves, setRemainingLeaves] = useState(0);
     const [orgId, setOrgId] = useState(null);
     const [showApplyLeaveModal, setShowApplyLeaveModal] = useState(false);
+    const [selectedCategory, setSelectedCategory] = useState('Casual Leave');
     const [leaveFormData, setLeaveFormData] = useState({
-        leaveType: 'Casual Leave',
+        leaveType: 'Vacation',
         startDate: '',
         endDate: '',
         reason: ''
     });
     const [selectedDates, setSelectedDates] = useState([]);
     const [dateToAdd, setDateToAdd] = useState('');
+
 
     const addSelectedDate = (date) => {
         if (!date) return;
@@ -38,10 +40,11 @@ const MyLeavesPage = () => {
     const isCasualExhausted = (remainingLeaves ?? 0) <= 0;
 
     useEffect(() => {
-        if (isCasualExhausted && leaveFormData.leaveType === 'Casual Leave') {
+        if (isCasualExhausted && selectedCategory === 'Casual Leave') {
+            setSelectedCategory('Sick Leave');
             setLeaveFormData(prev => ({ ...prev, leaveType: 'Sick Leave' }));
         }
-    }, [isCasualExhausted, leaveFormData.leaveType]);
+    }, [isCasualExhausted, selectedCategory]);
 
     // Calculate LOP vs Paid breakdown
     const calculateBreakdown = () => {
@@ -209,10 +212,13 @@ const MyLeavesPage = () => {
 
     const handleAction = (action) => {
         if (action === 'Apply for Leave') {
+            const initialCategory = remainingLeaves <= 0 ? 'Sick Leave' : 'Casual Leave';
+            setSelectedCategory(initialCategory);
             setLeaveFormData(prev => ({
                 ...prev,
-                leaveType: remainingLeaves <= 0 ? 'Sick Leave' : 'Casual Leave'
+                leaveType: initialCategory === 'Casual Leave' ? 'Vacation' : initialCategory
             }));
+
             setSelectedDates([]);
             setDateToAdd('');
             setShowApplyLeaveModal(true);
@@ -332,7 +338,9 @@ const MyLeavesPage = () => {
 
             addToast('Leave application submitted successfully', 'success');
             setShowApplyLeaveModal(false);
-            setLeaveFormData({ leaveType: 'Casual Leave', startDate: '', endDate: '', reason: '' });
+            setSelectedCategory('Casual Leave');
+            setLeaveFormData({ leaveType: 'Vacation', startDate: '', endDate: '', reason: '' });
+
             setSelectedDates([]);
             setDateToAdd('');
         } catch (error) {
@@ -569,25 +577,48 @@ const MyLeavesPage = () => {
 
                         <form onSubmit={handleApplyLeave} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                             <div>
-                                <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 500, marginBottom: '8px', color: 'var(--text-primary)' }}>Leave Type</label>
+                                <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 500, marginBottom: '8px', color: 'var(--text-primary)' }}>Leave Category</label>
                                 <select
-                                    value={leaveFormData.leaveType}
-                                    onChange={(e) => setLeaveFormData({ ...leaveFormData, leaveType: e.target.value })}
+                                    value={selectedCategory}
+                                    onChange={(e) => {
+                                        const cat = e.target.value;
+                                        setSelectedCategory(cat);
+                                        if (cat === 'Casual Leave') {
+                                            setLeaveFormData({ ...leaveFormData, leaveType: 'Vacation' });
+                                        } else {
+                                            setLeaveFormData({ ...leaveFormData, leaveType: cat });
+                                        }
+                                    }}
                                     style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '1rem', backgroundColor: 'var(--background)', color: 'var(--text-primary)' }}
                                     required
                                 >
                                     <option value="Casual Leave" disabled={isCasualExhausted}>Casual Leave</option>
                                     <option value="Sick Leave">Sick Leave</option>
-                                    <option value="Vacation">Vacation</option>
-                                    <option value="Personal Leave">Personal Leave</option>
-                                    <option value="Loss of Pay">Loss of Pay</option>
+                                    <option value="Loss of Pay">Loss of Pay Leaves</option>
                                 </select>
+
+                                {selectedCategory === 'Casual Leave' && (
+                                    <div style={{ marginTop: '16px' }}>
+                                        <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 500, marginBottom: '8px', color: 'var(--text-primary)' }}>Casual Leave Sub-option</label>
+                                        <select
+                                            value={leaveFormData.leaveType}
+                                            onChange={(e) => setLeaveFormData({ ...leaveFormData, leaveType: e.target.value })}
+                                            style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '1rem', backgroundColor: 'var(--background)', color: 'var(--text-primary)' }}
+                                            required
+                                        >
+                                            <option value="Vacation">Vacation Leaves</option>
+                                            <option value="Personal Leave">Personal Leave</option>
+                                        </select>
+                                    </div>
+                                )}
+
                                 {isCasualExhausted && (
                                     <div style={{ marginTop: '6px', fontSize: '0.8rem', color: '#991b1b', fontWeight: 600 }}>
                                         Casual Leave is exhausted. You may choose any leave type, but this request will be marked as Loss of Pay.
                                     </div>
                                 )}
                             </div>
+
 
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                                 <div>
