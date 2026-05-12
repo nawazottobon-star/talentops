@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Eye, Download, Edit, Trash2, FileCheck } from 'lucide-react';
+import { Eye, Download, Edit, Trash2, FileCheck, AlertCircle } from 'lucide-react';
 import DataTable from '../../manager/components/UI/DataTable'; // Or the correct shared path for DataTable
 import { supabase } from '../../../lib/supabaseClient';
 import DocumentViewer from '../DocumentViewer';
@@ -19,6 +19,7 @@ const PoliciesFeature = ({
     const [showPolicyPreview, setShowPolicyPreview] = useState(false);
     const [policyPreviewUrl, setPolicyPreviewUrl] = useState('');
     const [policyPreviewFileName, setPolicyPreviewFileName] = useState('');
+    const [confirmModal, setConfirmModal] = useState({ show: false, title: '', message: '', onConfirm: null });
 
     const handlePolicyView = async (policy) => {
         try {
@@ -183,7 +184,14 @@ const PoliciesFeature = ({
             accessor: 'delete',
             render: (row) => (
                 <button
-                    onClick={() => onDeletePolicy && onDeletePolicy(row)}
+                    onClick={() => {
+                        setConfirmModal({
+                            show: true,
+                            title: 'Delete Policy',
+                            message: `Are you sure you want to delete the policy "${row.name}"? This action cannot be undone.`,
+                            onConfirm: () => onDeletePolicy && onDeletePolicy(row)
+                        });
+                    }}
                     style={{
                         padding: '6px 12px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 600,
                         backgroundColor: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca',
@@ -308,6 +316,80 @@ const PoliciesFeature = ({
                                 setPolicyPreviewUrl('');
                             }}
                         />
+                    </div>
+                </div>
+            )}
+
+            {/* Premium Confirmation Modal */}
+            {confirmModal.show && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                    backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000,
+                    backdropFilter: 'blur(8px)', animation: 'fadeIn 0.2s ease-out'
+                }}>
+                    <div style={{ 
+                        backgroundColor: 'white', 
+                        padding: '32px', 
+                        borderRadius: '24px', 
+                        width: '400px', 
+                        maxWidth: '90%', 
+                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+                        border: '1px solid #e2e8f0',
+                        textAlign: 'center'
+                    }}>
+                        <div style={{ 
+                            width: '64px', 
+                            height: '64px', 
+                            borderRadius: '20px', 
+                            backgroundColor: '#fee2e2',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            margin: '0 auto 20px auto'
+                        }}>
+                            <AlertCircle size={32} color="#ef4444" />
+                        </div>
+                        <h3 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a', marginBottom: '12px' }}>{confirmModal.title}</h3>
+                        <p style={{ color: '#64748b', fontSize: '1rem', lineHeight: '1.5', marginBottom: '32px' }}>{confirmModal.message}</p>
+                        
+                        <div style={{ display: 'flex', gap: '12px' }}>
+                            <button 
+                                onClick={() => setConfirmModal({ ...confirmModal, show: false })}
+                                style={{
+                                    flex: 1,
+                                    padding: '14px', 
+                                    borderRadius: '14px', 
+                                    backgroundColor: '#f1f5f9',
+                                    color: '#0f172a',
+                                    border: '1px solid #e2e8f0', 
+                                    cursor: 'pointer', 
+                                    fontWeight: 700,
+                                    transition: 'all 0.2s'
+                                }}
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                onClick={() => {
+                                    if (confirmModal.onConfirm) confirmModal.onConfirm();
+                                    setConfirmModal({ ...confirmModal, show: false });
+                                }}
+                                style={{
+                                    flex: 1,
+                                    padding: '14px', 
+                                    borderRadius: '14px',
+                                    backgroundColor: '#ef4444',
+                                    color: 'white', 
+                                    border: 'none', 
+                                    fontWeight: 700, 
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s',
+                                    boxShadow: '0 4px 12px rgba(239, 68, 68, 0.2)'
+                                }}
+                            >
+                                Confirm Delete
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

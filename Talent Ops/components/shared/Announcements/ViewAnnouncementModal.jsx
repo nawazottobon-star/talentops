@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../../lib/supabaseClient';
-import { Calendar, Clock, MapPin, Users, User, X, Trash2 } from 'lucide-react';
+import { Calendar, Clock, MapPin, Users, User, X, Trash2, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 const ViewAnnouncementModal = ({
     selectedEvent,
@@ -14,6 +14,7 @@ const ViewAnnouncementModal = ({
     orgId
 }) => {
     const [eventParticipants, setEventParticipants] = useState({ loading: false, names: [], type: '' });
+    const [confirmModal, setConfirmModal] = useState({ show: false, title: '', message: '', onConfirm: null, type: 'danger' });
 
     // Fetch Participants for Selected Event
     useEffect(() => {
@@ -85,20 +86,34 @@ const ViewAnnouncementModal = ({
         fetchParticipants();
     }, [selectedEvent, orgId]);
 
-    const handleDelete = async (e) => {
+    const handleDelete = (e) => {
         e.stopPropagation();
-        if (onDelete && window.confirm('Are you sure you want to delete this event? This action cannot be undone.')) {
-            await onDelete(selectedEvent.id);
-            onClose();
-        }
+        if (!onDelete) return;
+        setConfirmModal({
+            show: true,
+            title: 'Delete Event',
+            message: 'Are you sure you want to delete this event? This action cannot be undone.',
+            type: 'danger',
+            onConfirm: async () => {
+                await onDelete(selectedEvent.id);
+                onClose();
+            }
+        });
     };
 
-    const handleUpdate = async (e, newStatus) => {
+    const handleUpdate = (e, newStatus) => {
         e.stopPropagation();
-        if (onUpdateStatus && window.confirm(`Are you sure you want to mark this event as ${newStatus}?`)) {
-            await onUpdateStatus(selectedEvent.id, newStatus);
-            onClose();
-        }
+        if (!onUpdateStatus) return;
+        setConfirmModal({
+            show: true,
+            title: 'Update Event Status',
+            message: `Are you sure you want to mark this event as ${newStatus}?`,
+            type: 'info',
+            onConfirm: async () => {
+                await onUpdateStatus(selectedEvent.id, newStatus);
+                onClose();
+            }
+        });
     };
 
     if (!selectedEvent) return null;
@@ -309,6 +324,84 @@ const ViewAnnouncementModal = ({
                     </div>
                 </div>
             </div>
+
+            {/* Premium Confirmation Modal */}
+            {confirmModal.show && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                    backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3000,
+                    backdropFilter: 'blur(8px)', animation: 'fadeIn 0.2s ease-out'
+                }}>
+                    <div style={{ 
+                        backgroundColor: 'white', 
+                        padding: '32px', 
+                        borderRadius: '24px', 
+                        width: '400px', 
+                        maxWidth: '90%', 
+                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+                        border: '1px solid #e2e8f0',
+                        textAlign: 'center'
+                    }}>
+                        <div style={{ 
+                            width: '64px', 
+                            height: '64px', 
+                            borderRadius: '20px', 
+                            backgroundColor: confirmModal.type === 'danger' ? '#fee2e2' : '#e0f2fe',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            margin: '0 auto 20px auto'
+                        }}>
+                            {confirmModal.type === 'danger' ? (
+                                <AlertCircle size={32} color="#ef4444" />
+                            ) : (
+                                <CheckCircle2 size={32} color="#0ea5e9" />
+                            )}
+                        </div>
+                        <h3 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a', marginBottom: '12px' }}>{confirmModal.title}</h3>
+                        <p style={{ color: '#64748b', fontSize: '1rem', lineHeight: '1.5', marginBottom: '32px' }}>{confirmModal.message}</p>
+                        
+                        <div style={{ display: 'flex', gap: '12px' }}>
+                            <button 
+                                onClick={() => setConfirmModal({ ...confirmModal, show: false })}
+                                style={{
+                                    flex: 1,
+                                    padding: '14px', 
+                                    borderRadius: '14px', 
+                                    backgroundColor: '#f1f5f9',
+                                    color: '#0f172a',
+                                    border: '1px solid #e2e8f0', 
+                                    cursor: 'pointer', 
+                                    fontWeight: 700,
+                                    transition: 'all 0.2s'
+                                }}
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                onClick={() => {
+                                    confirmModal.onConfirm();
+                                    setConfirmModal({ ...confirmModal, show: false });
+                                }}
+                                style={{
+                                    flex: 1,
+                                    padding: '14px', 
+                                    borderRadius: '14px',
+                                    backgroundColor: confirmModal.type === 'danger' ? '#ef4444' : '#0ea5e9',
+                                    color: 'white', 
+                                    border: 'none', 
+                                    fontWeight: 700, 
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s',
+                                    boxShadow: confirmModal.type === 'danger' ? '0 4px 12px rgba(239, 68, 68, 0.2)' : '0 4px 12px rgba(14, 165, 233, 0.2)'
+                                }}
+                            >
+                                Confirm
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

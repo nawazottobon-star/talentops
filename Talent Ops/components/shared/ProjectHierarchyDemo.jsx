@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Mail, Phone, MapPin, Folder, ChevronRight, User, Plus, Trash2, Edit2, Search, Check, RotateCcw } from 'lucide-react';
+import { X, Mail, Phone, MapPin, Folder, ChevronRight, User, Plus, Trash2, Edit2, Search, Check, RotateCcw, AlertCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 
 import { useProject } from '../employee/context/ProjectContext';
@@ -23,6 +23,7 @@ const ProjectHierarchyDemo = ({ isEditingEnabled = false }) => {
     // Modal States
     const [selectedEmployee, setSelectedEmployee] = useState(null); // For viewing details
     const [showAddMemberModal, setShowAddMemberModal] = useState(false);
+    const [confirmModal, setConfirmModal] = useState({ show: false, title: '', message: '', onConfirm: null });
 
     // Fetch org_id from current user
     useEffect(() => {
@@ -161,24 +162,28 @@ const ProjectHierarchyDemo = ({ isEditingEnabled = false }) => {
     };
 
     // --- Actions ---
-    const handleRemoveMember = async (e, member) => {
+    const handleRemoveMember = (e, member) => {
         e.stopPropagation();
-        if (window.confirm(`Are you sure you want to remove ${member.full_name} from this project?`)) {
-            try {
-                // Remove from project_members table
-                const { error } = await supabase
-                    .from('project_members')
-                    .delete()
-                    .eq('project_id', selectedProject.id)
-                    .eq('user_id', member.id);
+        setConfirmModal({
+            show: true,
+            title: 'Remove Member',
+            message: `Are you sure you want to remove ${member.full_name} from this project?`,
+            onConfirm: async () => {
+                try {
+                    const { error } = await supabase
+                        .from('project_members')
+                        .delete()
+                        .eq('project_id', selectedProject.id)
+                        .eq('user_id', member.id);
 
-                if (error) throw error;
-                fetchHierarchy();
-            } catch (err) {
-                console.error("Error removing member:", err);
-                alert("Failed to remove member");
+                    if (error) throw error;
+                    fetchHierarchy();
+                } catch (err) {
+                    console.error("Error removing member:", err);
+                    alert("Failed to remove member");
+                }
             }
-        }
+        });
     };
 
     // Add Member Handlers
@@ -1056,6 +1061,80 @@ const ProjectHierarchyDemo = ({ isEditingEnabled = false }) => {
                             ...(selectedProject.staff || [])
                         ]}
                     />
+                )}
+
+                {/* Premium Confirmation Modal */}
+                {confirmModal.show && (
+                    <div style={{
+                        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                        backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3000,
+                        backdropFilter: 'blur(8px)'
+                    }}>
+                        <div style={{ 
+                            backgroundColor: 'white', 
+                            padding: '32px', 
+                            borderRadius: '24px', 
+                            width: '400px', 
+                            maxWidth: '90%', 
+                            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+                            border: '1px solid #e2e8f0',
+                            textAlign: 'center'
+                        }}>
+                            <div style={{ 
+                                width: '64px', 
+                                height: '64px', 
+                                borderRadius: '20px', 
+                                backgroundColor: '#fee2e2',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                margin: '0 auto 20px auto'
+                            }}>
+                                <AlertCircle size={32} color="#ef4444" />
+                            </div>
+                            <h3 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a', marginBottom: '12px' }}>{confirmModal.title}</h3>
+                            <p style={{ color: '#64748b', fontSize: '1rem', lineHeight: '1.5', marginBottom: '32px' }}>{confirmModal.message}</p>
+                            
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                                <button 
+                                    onClick={() => setConfirmModal({ ...confirmModal, show: false })}
+                                    style={{
+                                        flex: 1,
+                                        padding: '14px', 
+                                        borderRadius: '14px', 
+                                        backgroundColor: '#f1f5f9',
+                                        color: '#0f172a',
+                                        border: '1px solid #e2e8f0', 
+                                        cursor: 'pointer', 
+                                        fontWeight: 700,
+                                        transition: 'all 0.2s'
+                                    }}
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    onClick={() => {
+                                        if (confirmModal.onConfirm) confirmModal.onConfirm();
+                                        setConfirmModal({ ...confirmModal, show: false });
+                                    }}
+                                    style={{
+                                        flex: 1,
+                                        padding: '14px', 
+                                        borderRadius: '14px',
+                                        backgroundColor: '#ef4444',
+                                        color: 'white', 
+                                        border: 'none', 
+                                        fontWeight: 700, 
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s',
+                                        boxShadow: '0 4px 12px rgba(239, 68, 68, 0.2)'
+                                    }}
+                                >
+                                    Confirm Remove
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 )}
 
                 {/* Controls */}

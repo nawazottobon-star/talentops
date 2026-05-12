@@ -133,14 +133,13 @@ export const submitTaskProof = async ({
             phase_validations: updatedValidations,
             proof_url: combinedUrlsString,    // Legacy column
             proof_text: combinedText || null,  // Legacy column
-            sub_state: nextPhase !== currentPhase ? 'in_progress' : 'pending_validation',
+            sub_state: 'pending_validation',
             status: 'in_progress',
             updated_at: new Date().toISOString()
         };
 
-        if (nextPhase !== currentPhase) {
-            updates.lifecycle_state = nextPhase;
-        }
+        // Note: We NO LONGER advance lifecycle_state here. 
+        // Advancement only happens upon Manager Approval.
 
         onProgress?.(75);
 
@@ -449,7 +448,7 @@ export const approveTaskPhase = async (task, phaseKey, orgId) => {
     return { updatedValidations, newSubState, isCompleted: isLastPhaseApproved };
 };
 
-export const rejectTaskPhase = async (task, phaseKey, orgId) => {
+export const rejectTaskPhase = async (task, phaseKey, orgId, reason) => {
     const currentValidations = task.phase_validations || {};
     const phaseData = currentValidations[phaseKey];
     if (!phaseData) throw new Error('Phase data not found');
@@ -459,7 +458,8 @@ export const rejectTaskPhase = async (task, phaseKey, orgId) => {
         [phaseKey]: {
             ...phaseData,
             status: 'rejected',
-            rejected_at: new Date().toISOString()
+            rejected_at: new Date().toISOString(),
+            rejection_reason: reason || 'No reason provided'
         }
     };
 

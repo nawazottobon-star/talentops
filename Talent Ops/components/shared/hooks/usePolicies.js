@@ -51,8 +51,6 @@ export const usePolicies = (orgId, addToast) => {
     }, [fetchPolicies]);
 
     const handleDeletePolicy = async (policy) => {
-        if (!window.confirm('Are you sure you want to delete this policy? This action cannot be undone.')) return;
-
         try {
             const filePathStart = policy.file_url.indexOf('/policies/');
             if (filePathStart === -1) throw new Error("Invalid file URL format.");

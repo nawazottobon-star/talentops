@@ -1,5 +1,5 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
-import { Briefcase, Calendar, Check, X, MoreVertical, Edit2, Trash2, Star, Code, GraduationCap } from 'lucide-react';
+import { Briefcase, Calendar, Check, X, MoreVertical, Edit2, Trash2, Star, Code, GraduationCap, AlertCircle } from 'lucide-react';
 import { differenceInDays, format } from 'date-fns';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { supabase } from '../../lib/supabaseClient';
@@ -28,6 +28,7 @@ export const CareerHistory = forwardRef<CareerHistoryRef, CareerHistoryProps>(({
   const [fetching, setFetching] = useState(false);
 
   const [globalDepartment, setGlobalDepartment] = useState('Engineering');
+  const [confirmModal, setConfirmModal] = useState({ show: false, title: '', message: '', onConfirm: null });
 
   const [formData, setFormData] = useState({
     title: '',
@@ -182,16 +183,21 @@ export const CareerHistory = forwardRef<CareerHistoryRef, CareerHistoryProps>(({
       return;
     }
 
-    if (window.confirm("Are you sure you want to delete this position permanently?")) {
-      try {
-        const { error } = await supabase.from('career_history').delete().eq('id', id);
-        if (error) throw error;
-        setPositions(prev => prev.filter(p => p.id !== id));
-      } catch (err) {
-        console.error("Failed to delete", err);
-        alert("Failed to delete position.");
+    setConfirmModal({
+      show: true,
+      title: 'Delete Position',
+      message: 'Are you sure you want to delete this position permanently? This will remove it from your career timeline.',
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase.from('career_history').delete().eq('id', id);
+          if (error) throw error;
+          setPositions(prev => prev.filter(p => p.id !== id));
+        } catch (err) {
+          console.error("Failed to delete", err);
+          alert("Failed to delete position.");
+        }
       }
-    }
+    });
   };
 
   const handleEditPosition = (id: string, e: React.MouseEvent) => {
@@ -405,6 +411,80 @@ export const CareerHistory = forwardRef<CareerHistoryRef, CareerHistoryProps>(({
           </div>
         )}
       </div>
+
+      {/* Premium Confirmation Modal */}
+      {confirmModal.show && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3000,
+          backdropFilter: 'blur(8px)'
+        }}>
+          <div style={{ 
+            backgroundColor: 'white', 
+            padding: '32px', 
+            borderRadius: '24px', 
+            width: '400px', 
+            maxWidth: '90%', 
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+            border: '1px solid #e2e8f0',
+            textAlign: 'center'
+          }}>
+            <div style={{ 
+              width: '64px', 
+              height: '64px', 
+              borderRadius: '20px', 
+              backgroundColor: '#fee2e2',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 20px auto'
+            }}>
+              <AlertCircle size={32} color="#ef4444" />
+            </div>
+            <h3 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a', marginBottom: '12px' }}>{confirmModal.title}</h3>
+            <p style={{ color: '#64748b', fontSize: '1rem', lineHeight: '1.5', marginBottom: '32px' }}>{confirmModal.message}</p>
+            
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button 
+                onClick={() => setConfirmModal({ ...confirmModal, show: false })}
+                style={{
+                  flex: 1,
+                  padding: '14px', 
+                  borderRadius: '14px', 
+                  backgroundColor: '#f1f5f9',
+                  color: '#0f172a',
+                  border: '1px solid #e2e8f0', 
+                  cursor: 'pointer', 
+                  fontWeight: 700,
+                  transition: 'all 0.2s'
+                }}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={() => {
+                  if (confirmModal.onConfirm) confirmModal.onConfirm();
+                  setConfirmModal({ ...confirmModal, show: false });
+                }}
+                style={{
+                  flex: 1,
+                  padding: '14px', 
+                  borderRadius: '14px',
+                  backgroundColor: '#ef4444',
+                  color: 'white', 
+                  border: 'none', 
+                  fontWeight: 700, 
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  boxShadow: '0 4px 12px rgba(239, 68, 68, 0.2)'
+                }}
+              >
+                Confirm Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 });

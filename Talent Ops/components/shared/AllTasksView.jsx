@@ -88,6 +88,12 @@ const AllTasksView = ({ userRole = 'employee', projectRole = 'employee', userId,
     const [showNotesModal, setShowNotesModal] = useState(false);
     const [taskForNotes, setTaskForNotes] = useState(null);
 
+    // Rejection Modal State
+    const [showRejectModal, setShowRejectModal] = useState(false);
+    const [rejectReason, setRejectReason] = useState('');
+    const [taskToReject, setTaskToReject] = useState(null);
+    const [phaseToReject, setPhaseToReject] = useState(null);
+
     const handleRequestAccess = async () => {
         if (!accessReason.trim()) {
             addToast?.('Please provide a reason', 'error');
@@ -128,6 +134,9 @@ const AllTasksView = ({ userRole = 'employee', projectRole = 'employee', userId,
     const [closureReason, setClosureReason] = useState('');
     const [reassignTarget, setReassignTarget] = useState('');
     const [processingReview, setProcessingReview] = useState(false);
+
+    // Confirmation Modal State
+    const [confirmModal, setConfirmModal] = useState({ show: false, title: '', message: '', onConfirm: null, type: 'danger' });
 
     const processAccessReview = async () => {
         if (!accessReviewTask) return;
@@ -258,15 +267,22 @@ const AllTasksView = ({ userRole = 'employee', projectRole = 'employee', userId,
         }
     };
 
-    const handleDeleteTask = async (taskId) => {
-        if (!window.confirm('Are you sure you want to delete this task?')) return;
-        try {
-            await taskService.deleteTask(taskId, orgId);
-            addToast?.('Task deleted', 'success');
-            fetchData();
-        } catch (error) {
-            addToast?.('Failed to delete task', 'error');
-        }
+    const handleDeleteTask = (taskId, taskTitle = 'this task') => {
+        setConfirmModal({
+            show: true,
+            title: 'Delete Task',
+            message: `Are you sure you want to delete task "${taskTitle}"? This action cannot be undone.`,
+            type: 'danger',
+            onConfirm: async () => {
+                try {
+                    await taskService.deleteTask(taskId, orgId);
+                    addToast?.('Task deleted successfully', 'success');
+                    fetchData();
+                } catch (error) {
+                    addToast?.('Failed to delete task', 'error');
+                }
+            }
+        });
     };
 
     const handleArchiveTask = async (taskId) => {
@@ -341,15 +357,22 @@ const AllTasksView = ({ userRole = 'employee', projectRole = 'employee', userId,
         }
     };
 
-    const handleDeleteStep = async (stepId) => {
-        if (!window.confirm('Delete this step?')) return;
-        try {
-            await taskService.deleteTaskStep(stepId, orgId);
-            setEditTaskSteps(prev => prev.filter(s => s.id !== stepId));
-            addToast?.('Step deleted', 'success');
-        } catch (error) {
-            addToast?.('Failed to delete step', 'error');
-        }
+    const handleDeleteStep = (stepId) => {
+        setConfirmModal({
+            show: true,
+            title: 'Delete Step',
+            message: 'Are you sure you want to delete this step? This will remove all associated work records.',
+            type: 'danger',
+            onConfirm: async () => {
+                try {
+                    await taskService.deleteTaskStep(stepId, orgId);
+                    setEditTaskSteps(prev => prev.filter(s => s.id !== stepId));
+                    addToast?.('Step deleted', 'success');
+                } catch (error) {
+                    addToast?.('Failed to delete step', 'error');
+                }
+            }
+        });
     };
 
     const handleUpdateStepInline = async (stepId, updates) => {
@@ -528,23 +551,41 @@ const AllTasksView = ({ userRole = 'employee', projectRole = 'employee', userId,
         }
     };
 
-    const handleRejectPhase = async (phaseKey) => {
+    const handleRejectPhase = (phaseKey) => {
         if (!selectedTask) return;
         if (processingApproval) return;
 
+        setTaskToReject(selectedTask);
+        setPhaseToReject(phaseKey);
+        setRejectReason('');
+        setShowRejectModal(true);
+    };
+
+    const submitRejectPhase = async () => {
+        if (!taskToReject || !phaseToReject || !rejectReason.trim()) return;
+
         setProcessingApproval(true);
         try {
-            const updatedValidations = await taskService.rejectTaskPhase(selectedTask, phaseKey, orgId);
+            const updatedValidations = await taskService.rejectTaskPhase(taskToReject, phaseToReject, orgId, rejectReason);
 
-            addToast?.('Phase rejected', 'info');
+            addToast?.('Phase rejected with feedback', 'info');
 
             const updatedTask = {
-                ...selectedTask,
+                ...taskToReject,
                 phase_validations: updatedValidations,
                 sub_state: 'in_progress'
             };
-            setSelectedTask(updatedTask);
-            setTasks(prev => prev.map(t => t.id === selectedTask.id ? updatedTask : t));
+            
+            // Sync states
+            if (selectedTask?.id === taskToReject.id) {
+                setSelectedTask(updatedTask);
+            }
+            setTasks(prev => prev.map(t => t.id === taskToReject.id ? updatedTask : t));
+            
+            setShowRejectModal(false);
+            setTaskToReject(null);
+            setPhaseToReject(null);
+            setRejectReason('');
 
         } catch (error) {
             console.error('Error rejecting phase:', error);
@@ -1382,11 +1423,9 @@ const AllTasksView = ({ userRole = 'employee', projectRole = 'employee', userId,
                                         </button>
                                         <button
                                             onClick={() => {
-                                                if (window.confirm(`Are you sure you want to delete task "${editingTask.title}"?`)) {
-                                                    handleDeleteTask(editingTask.id);
-                                                    setShowEditModal(false);
-                                                    setEditingTask(null);
-                                                }
+                                                handleDeleteTask(editingTask.id, editingTask.title);
+                                                setShowEditModal(false);
+                                                setEditingTask(null);
                                             }}
                                             style={{ flex: 1, backgroundColor: '#ef4444', color: 'white', padding: '12px', borderRadius: '8px', fontWeight: 600, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
                                         >
@@ -1773,6 +1812,221 @@ const AllTasksView = ({ userRole = 'employee', projectRole = 'employee', userId,
                     (taskForNotes?.assigned_to === userId)
                 }
             />
+            {/* Premium Reject Modal */}
+            {showRejectModal && taskToReject && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                    backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000,
+                    backdropFilter: 'blur(8px)', animation: 'fadeIn 0.2s ease-out'
+                }}>
+                    <style>{`
+                        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+                        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+                    `}</style>
+                    <div style={{ 
+                        backgroundColor: 'var(--surface)', 
+                        padding: '32px', 
+                        borderRadius: '24px', 
+                        width: '500px', 
+                        maxWidth: '90%', 
+                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+                        border: '1px solid var(--border)',
+                        animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
+                            <div style={{ 
+                                backgroundColor: '#fee2e2', 
+                                borderRadius: '14px', 
+                                padding: '14px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                            }}>
+                                <AlertTriangle size={28} color="#ef4444" />
+                            </div>
+                            <div>
+                                <h3 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>Reject Phase</h3>
+                                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: '4px 0 0 0' }}>
+                                    Feedback for: <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{taskToReject.title}</span>
+                                </p>
+                            </div>
+                        </div>
+
+                        <div style={{ marginBottom: '24px' }}>
+                            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                Rejection Reason *
+                            </label>
+                            <textarea
+                                value={rejectReason}
+                                onChange={(e) => setRejectReason(e.target.value)}
+                                placeholder="Explain why this phase is being rejected and what needs to be fixed..."
+                                style={{
+                                    width: '100%', 
+                                    minHeight: '140px', 
+                                    padding: '16px', 
+                                    borderRadius: '16px',
+                                    border: '2px solid var(--border)', 
+                                    backgroundColor: 'var(--background)',
+                                    color: 'var(--text-primary)',
+                                    fontSize: '1rem', 
+                                    outline: 'none',
+                                    transition: 'all 0.2s ease',
+                                    resize: 'vertical',
+                                    boxSizing: 'border-box',
+                                    lineHeight: '1.5'
+                                }}
+                                onFocus={e => {
+                                    e.target.style.borderColor = '#ef4444';
+                                    e.target.style.boxShadow = '0 0 0 4px rgba(239, 68, 68, 0.1)';
+                                }}
+                                onBlur={e => {
+                                    e.target.style.borderColor = 'var(--border)';
+                                    e.target.style.boxShadow = 'none';
+                                }}
+                                autoFocus
+                            />
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '14px' }}>
+                            <button 
+                                onClick={() => { setShowRejectModal(false); setTaskToReject(null); }} 
+                                style={{
+                                    padding: '12px 24px', 
+                                    borderRadius: '12px', 
+                                    backgroundColor: 'transparent',
+                                    color: 'var(--text-secondary)',
+                                    border: '1px solid var(--border)', 
+                                    cursor: 'pointer', 
+                                    fontWeight: 700,
+                                    fontSize: '0.95rem',
+                                    transition: 'all 0.2s'
+                                }}
+                                onMouseEnter={e => e.target.style.backgroundColor = 'var(--background)'}
+                                onMouseLeave={e => e.target.style.backgroundColor = 'transparent'}
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                onClick={submitRejectPhase} 
+                                disabled={processingApproval || !rejectReason.trim()} 
+                                style={{
+                                    padding: '12px 28px', 
+                                    borderRadius: '12px',
+                                    background: !rejectReason.trim() ? '#94a3b8' : 'linear-gradient(135deg, #ef4444, #dc2626)',
+                                    color: 'white', 
+                                    border: 'none', 
+                                    fontWeight: 700, 
+                                    fontSize: '0.95rem',
+                                    cursor: !rejectReason.trim() ? 'not-allowed' : 'pointer',
+                                    transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                                    boxShadow: !rejectReason.trim() ? 'none' : '0 8px 20px rgba(239, 68, 68, 0.3)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px'
+                                }}
+                                onMouseEnter={e => {
+                                    if (rejectReason.trim()) {
+                                        e.target.style.transform = 'translateY(-2px)';
+                                        e.target.style.boxShadow = '0 12px 25px rgba(239, 68, 68, 0.4)';
+                                    }
+                                }}
+                                onMouseLeave={e => {
+                                    if (rejectReason.trim()) {
+                                        e.target.style.transform = 'translateY(0)';
+                                        e.target.style.boxShadow = '0 8px 20px rgba(239, 68, 68, 0.3)';
+                                    }
+                                }}
+                            >
+                                {processingApproval ? 'Processing...' : (
+                                    <>
+                                        <ThumbsDown size={18} /> Confirm Rejection
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Premium Confirmation Modal */}
+            {confirmModal.show && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                    backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3000,
+                    backdropFilter: 'blur(8px)', animation: 'fadeIn 0.2s ease-out'
+                }}>
+                    <div style={{ 
+                        backgroundColor: 'var(--surface)', 
+                        padding: '32px', 
+                        borderRadius: '24px', 
+                        width: '400px', 
+                        maxWidth: '90%', 
+                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+                        border: '1px solid var(--border)',
+                        animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+                        textAlign: 'center'
+                    }}>
+                        <div style={{ 
+                            width: '64px', 
+                            height: '64px', 
+                            borderRadius: '20px', 
+                            backgroundColor: confirmModal.type === 'danger' ? '#fee2e2' : '#e0f2fe',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            margin: '0 auto 20px auto'
+                        }}>
+                            {confirmModal.type === 'danger' ? (
+                                <AlertCircle size={32} color="#ef4444" />
+                            ) : (
+                                <CheckCircle2 size={32} color="#0ea5e9" />
+                            )}
+                        </div>
+                        <h3 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '12px' }}>{confirmModal.title}</h3>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '1rem', lineHeight: '1.5', marginBottom: '32px' }}>{confirmModal.message}</p>
+                        
+                        <div style={{ display: 'flex', gap: '12px' }}>
+                            <button 
+                                onClick={() => setConfirmModal({ ...confirmModal, show: false })}
+                                style={{
+                                    flex: 1,
+                                    padding: '14px', 
+                                    borderRadius: '14px', 
+                                    backgroundColor: 'var(--background)',
+                                    color: 'var(--text-primary)',
+                                    border: '1px solid var(--border)', 
+                                    cursor: 'pointer', 
+                                    fontWeight: 700,
+                                    transition: 'all 0.2s'
+                                }}
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                onClick={() => {
+                                    confirmModal.onConfirm();
+                                    setConfirmModal({ ...confirmModal, show: false });
+                                }}
+                                style={{
+                                    flex: 1,
+                                    padding: '14px', 
+                                    borderRadius: '14px',
+                                    backgroundColor: confirmModal.type === 'danger' ? '#ef4444' : '#0ea5e9',
+                                    color: 'white', 
+                                    border: 'none', 
+                                    fontWeight: 700, 
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s',
+                                    boxShadow: confirmModal.type === 'danger' ? '0 4px 12px rgba(239, 68, 68, 0.2)' : '0 4px 12px rgba(14, 165, 233, 0.2)'
+                                }}
+                                onMouseEnter={e => e.target.style.transform = 'translateY(-2px)'}
+                                onMouseLeave={e => e.target.style.transform = 'translateY(0)'}
+                            >
+                                Confirm
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     );
 };
