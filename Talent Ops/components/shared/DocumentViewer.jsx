@@ -56,14 +56,18 @@ const DocumentViewer = ({ url, fileName, onClose }) => {
 
     // Detect file type
     const getFileType = (fileUrl) => {
-        const lower = fileUrl.toLowerCase();
-        if (/\.(jpg|jpeg|png|gif|webp|svg|bmp|ico)(\?|$)/i.test(lower)) return 'image';
-        if (/\.pdf(\?|$)/i.test(lower)) return 'pdf';
-        if (/\.(doc|docx)(\?|$)/i.test(lower)) return 'word';
-        if (/\.(xls|xlsx)(\?|$)/i.test(lower)) return 'excel';
-        if (/\.(ppt|pptx)(\?|$)/i.test(lower)) return 'powerpoint';
-        if (/\.(txt|md|csv|log|json)(\?|$)/i.test(lower)) return 'text';
-        if (/\.(zip|rar|7z|tar|gz)(\?|$)/i.test(lower)) return 'archive';
+        if (!fileUrl) return 'other';
+        // Remove query params and brackets before checking extension
+        const cleanUrl = fileUrl.split('?')[0].replace(/[\[\]"]/g, '');
+        const lower = cleanUrl.toLowerCase();
+        
+        if (/\.(jpg|jpeg|png|gif|webp|svg|bmp|ico)$/i.test(lower)) return 'image';
+        if (/\.pdf$/i.test(lower)) return 'pdf';
+        if (/\.(doc|docx)$/i.test(lower)) return 'word';
+        if (/\.(xls|xlsx)$/i.test(lower)) return 'excel';
+        if (/\.(ppt|pptx)$/i.test(lower)) return 'powerpoint';
+        if (/\.(txt|md|csv|log|json)$/i.test(lower)) return 'text';
+        if (/\.(zip|rar|7z|tar|gz)$/i.test(lower)) return 'archive';
         return 'other';
     };
 
@@ -105,7 +109,7 @@ const DocumentViewer = ({ url, fileName, onClose }) => {
     };
 
     const handleDownloadBtnClick = async (e) => {
-        e.preventDefault();
+        if (e) e.preventDefault();
         try {
             const response = await fetch(currentUrl);
             if (!response.ok) throw new Error('Network response was not ok');
@@ -117,7 +121,9 @@ const DocumentViewer = ({ url, fileName, onClose }) => {
             // Make sure it has an extension
             let downloadName = currentFileName || 'download';
             if (!downloadName.includes('.')) {
-                const ext = fileType === 'pdf' ? '.pdf' : '';
+                const ext = fileType === 'pdf' ? '.pdf' : 
+                            fileType === 'word' ? '.docx' : 
+                            fileType === 'excel' ? '.xlsx' : '';
                 downloadName = downloadName + ext;
             }
             a.download = downloadName;
@@ -128,7 +134,14 @@ const DocumentViewer = ({ url, fileName, onClose }) => {
             window.URL.revokeObjectURL(blobUrl);
         } catch (err) {
             console.error('Download failed, falling back to new tab:', err);
-            window.open(currentUrl, '_blank');
+            // Fallback: Use a direct link download if possible, else new tab
+            const link = document.createElement('a');
+            link.href = currentUrl;
+            link.target = '_blank';
+            link.download = currentFileName || '';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         }
     };
 
@@ -153,7 +166,7 @@ const DocumentViewer = ({ url, fileName, onClose }) => {
                             Unable to preview this file
                         </p>
                         <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', maxWidth: '400px', lineHeight: 1.6 }}>
-                            This file type may not support in-browser preview. You can download it or open in a new tab.
+                            This file may be private or the preview service is unavailable. Please download it to view.
                         </p>
                     </div>
                     <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
@@ -199,6 +212,12 @@ const DocumentViewer = ({ url, fileName, onClose }) => {
                     <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
                         Loading preview...
                     </span>
+                    <button 
+                        onClick={() => { setLoading(false); setError(true); }}
+                        style={{ fontSize: '0.75rem', color: accent, background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+                    >
+                        Skip preview & download
+                    </button>
                 </div>
             </div>
         ) : null;
@@ -233,6 +252,7 @@ const DocumentViewer = ({ url, fileName, onClose }) => {
 
         if (fileType === 'pdf') {
             // Use Google Docs Viewer for reliable inline PDF rendering
+            // NOTE: This only works for public URLs. 
             const googleDocsUrl = `https://docs.google.com/gview?url=${encodeURIComponent(currentUrl)}&embedded=true`;
             return (
                 <div style={{ width: '100%', height: '100%', position: 'relative', backgroundColor: 'var(--background)' }}>
@@ -242,7 +262,10 @@ const DocumentViewer = ({ url, fileName, onClose }) => {
                         src={googleDocsUrl}
                         style={{ width: '100%', height: '100%', border: 'none' }}
                         title="PDF Preview"
-                        onLoad={() => setLoading(false)}
+                        onLoad={() => {
+                            // If it stays "loading" for too long, it might be a private URL issue
+                            setTimeout(() => setLoading(false), 2000);
+                        }}
                         onError={() => { setError(true); setLoading(false); }}
                     />
                 </div>
@@ -261,7 +284,9 @@ const DocumentViewer = ({ url, fileName, onClose }) => {
                         src={officeUrl}
                         style={{ width: '100%', height: '100%', border: 'none' }}
                         title="Document Preview"
-                        onLoad={() => setLoading(false)}
+                        onLoad={() => {
+                            setTimeout(() => setLoading(false), 2500);
+                        }}
                         onError={() => {
                             // Fallback — try Google Docs viewer
                             setError(true);

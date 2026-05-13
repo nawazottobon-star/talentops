@@ -326,6 +326,28 @@ const TaskDetailOverlay = ({
         });
     };
 
+    // Helper to safely parse proof URLs (handles JSON arrays or comma-separated strings)
+    const getProofUrls = (urlField) => {
+        if (!urlField) return [];
+        if (Array.isArray(urlField)) return urlField;
+        
+        const trimmed = urlField.trim();
+        if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+            try {
+                const parsed = JSON.parse(trimmed);
+                return Array.isArray(parsed) ? parsed : [trimmed];
+            } catch (e) {
+                return [trimmed];
+            }
+        }
+        
+        if (trimmed.includes('http')) {
+            return trimmed.split(',').map(u => u.trim()).filter(Boolean);
+        }
+        
+        return trimmed ? [trimmed] : [];
+    };
+
     const handleSubmitProof = async () => {
         if (isTaskLocked) {
             addToast?.('Task is locked.', 'error');
@@ -396,18 +418,8 @@ const TaskDetailOverlay = ({
             const phaseVal = task.phase_validations?.[phaseKey];
             if (!phaseVal) return;
 
-            // Parse existing URLs
-            let existingUrls = [];
-            try {
-                const parsed = JSON.parse(phaseVal.proof_url);
-                existingUrls = Array.isArray(parsed) ? parsed : [phaseVal.proof_url];
-            } catch (e) {
-                if (phaseVal.proof_url.includes('http')) {
-                    existingUrls = phaseVal.proof_url.split(',').map(u => u.trim());
-                } else {
-                    existingUrls = [phaseVal.proof_url];
-                }
-            }
+            // Parse existing URLs using our safe helper
+            const existingUrls = getProofUrls(phaseVal.proof_url);
 
             // Remove the specified URL
             const updatedUrls = existingUrls.filter(url => url !== fileUrl);
@@ -1312,10 +1324,15 @@ const TaskDetailOverlay = ({
 
                                             {val.proof_url && (
                                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                                                    {val.proof_url.split(',').map((url, i) => (
+                                                    {getProofUrls(val.proof_url).map((url, i) => (
                                                         <div 
                                                             key={i} 
-                                                            onClick={() => { setPreviewUrl(url); setPreviewTitle(url.split('/').pop()); setShowPreview(true); }}
+                                                            onClick={() => { 
+                                                                const fileName = url.split('/').pop().split('?')[0];
+                                                                setPreviewUrl(url); 
+                                                                setPreviewTitle(fileName); 
+                                                                setShowPreview(true); 
+                                                            }}
                                                             style={{
                                                                 padding: '12px 16px',
                                                                 backgroundColor: 'white',
