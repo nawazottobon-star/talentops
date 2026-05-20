@@ -71,6 +71,7 @@ const AttendanceLogsPage = () => {
                     .from('profiles')
                     .select('id, full_name, email, role, avatar_url')
                     .eq('org_id', orgId)
+                    .eq('is_active', true)
                     .neq('role', 'executive')
                     .neq('role', 'admin');
 

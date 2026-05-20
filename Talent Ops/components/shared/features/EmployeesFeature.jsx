@@ -5,6 +5,7 @@ const EmployeesFeature = ({ employees, type, title, onAction }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [availabilityFilter, setAvailabilityFilter] = useState('all');
     const [viewMode, setViewMode] = useState('list'); // 'grid' or 'list'
+    const [statusFilter, setStatusFilter] = useState('Active'); // Defaults strictly to Active
 
     const filteredEmployees = employees.filter(emp => {
         // Search filter
@@ -18,8 +19,13 @@ const EmployeesFeature = ({ employees, type, title, onAction }) => {
             (availabilityFilter === 'online' && emp.availability === 'Online') ||
             (availabilityFilter === 'offline' && emp.availability === 'Offline') ||
             (availabilityFilter === 'on-leave' && emp.availability === 'On Leave');
-
-        return matchesSearch && matchesAvailability;
+ 
+        // Status filter (Active/Inactive/All)
+        const matchesStatus = statusFilter === 'All' ||
+            (statusFilter === 'Active' && emp.is_active !== false) ||
+            (statusFilter === 'Inactive' && emp.is_active === false);
+ 
+        return matchesSearch && matchesAvailability && matchesStatus;
     });
 
     return (
@@ -102,6 +108,40 @@ const EmployeesFeature = ({ employees, type, title, onAction }) => {
                                 <option value="on-leave">⨯ On Leave</option>
                             </select>
                             {/* Custom Select Arrow */}
+                            <div style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#94a3b8' }}>
+                                <svg width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                            </div>
+                        </div>
+
+                        {/* Workforce Status Filter */}
+                        <div style={{ position: 'relative' }}>
+                            <div style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', pointerEvents: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <Filter size={16} />
+                                <span style={{ width: '1px', height: '14px', backgroundColor: '#e2e8f0', margin: '0 4px' }}></span>
+                            </div>
+                            <select
+                                value={statusFilter}
+                                onChange={(e) => setStatusFilter(e.target.value)}
+                                style={{
+                                    padding: '12px 36px 12px 42px',
+                                    borderRadius: '12px',
+                                    border: '1px solid #e2e8f0',
+                                    fontWeight: '700',
+                                    fontSize: '0.85rem',
+                                    color: '#475569',
+                                    backgroundColor: '#ffffff',
+                                    cursor: 'pointer',
+                                    appearance: 'none',
+                                    outline: 'none',
+                                    minWidth: '160px'
+                                }}
+                            >
+                                <option value="Active">🟢 Active Personnel</option>
+                                <option value="Inactive">🔴 Former Personnel</option>
+                                <option value="All">⚪ All Workforce</option>
+                            </select>
                             <div style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#94a3b8' }}>
                                 <svg width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg">
                                     <path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -216,7 +256,12 @@ const EmployeesFeature = ({ employees, type, title, onAction }) => {
                                         )}
                                     </div>
                                     <div style={{ minWidth: 0, flex: 1 }}>
-                                        <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: '#0f172a', marginBottom: '2px', letterSpacing: '-0.02em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{emp.name}</h3>
+                                        <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: '#0f172a', marginBottom: '2px', letterSpacing: '-0.02em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            {emp.name}
+                                            {emp.is_active === false && (
+                                                <span style={{ backgroundColor: '#fee2e2', color: '#ef4444', fontSize: '0.65rem', fontWeight: '800', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase' }}>FORMER</span>
+                                            )}
+                                        </h3>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                             <span style={{ fontSize: '0.75rem', fontWeight: '600', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{emp.department_display}</span>
                                             <span style={{ color: '#cbd5e1', flexShrink: 0 }}>•</span>
@@ -401,6 +446,9 @@ const EmployeesFeature = ({ employees, type, title, onAction }) => {
                                 <div style={{ overflow: 'hidden' }}>
                                     <h4 style={{ fontSize: '1rem', fontWeight: '700', color: '#0f172a', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                         {emp.name}
+                                        {emp.is_active === false && (
+                                            <span style={{ backgroundColor: '#fee2e2', color: '#ef4444', fontSize: '0.65rem', fontWeight: '800', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase' }}>FORMER</span>
+                                        )}
                                     </h4>
                                     <p style={{ fontSize: '0.75rem', color: '#64748b', margin: 0 }}>{emp.job_title}</p>
                                 </div>
@@ -430,7 +478,9 @@ const EmployeesFeature = ({ employees, type, title, onAction }) => {
                             )}
 
                             <div>
-                                <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#475569' }}>{type === 'status' ? emp.lastActive : emp.availability}</div>
+                                <div style={{ fontSize: '0.85rem', fontWeight: '700', color: emp.is_active === false ? '#ef4444' : '#475569' }}>
+                                    {type === 'status' ? emp.lastActive : (emp.is_active === false ? 'Left Organization' : emp.availability)}
+                                </div>
                                 {type === 'status' && (
                                     <div style={{ fontSize: '0.65rem', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase' }}>Session Lock</div>
                                 )}

@@ -85,7 +85,7 @@ const ProjectWizard = ({ isOpen, onClose, onComplete, addToast }) => {
         try {
             // Fetch both profiles and departments to show human-readable names
             const [profilesRes, deptsRes] = await Promise.all([
-                supabase.from('profiles').select('id, full_name, email, role, department, job_title').eq('org_id', orgId).order('full_name'),
+                supabase.from('profiles').select('id, full_name, email, role, department, job_title').eq('org_id', orgId).eq('is_active', true).order('full_name'),
                 supabase.from('departments').select('id, department_name').eq('org_id', orgId)
             ]);
             

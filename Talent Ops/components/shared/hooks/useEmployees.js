@@ -33,7 +33,7 @@ export const useEmployees = (orgId) => {
 
             // 2. Fetch Employees and Team Assignments
             const [profilesRes, membersRes] = await Promise.all([
-                supabase.from('profiles').select('id, full_name, email, role, department, job_title, join_date, avatar_url, team_id, created_at, employment_type, is_paid').eq('org_id', orgId),
+                supabase.from('profiles').select('id, full_name, email, role, department, job_title, join_date, avatar_url, team_id, created_at, employment_type, is_paid, is_active').eq('org_id', orgId),
                 supabase.from('project_members').select('user_id, project_id, role, projects:project_id(name)').eq('org_id', orgId)
             ]);
 
@@ -118,7 +118,8 @@ export const useEmployees = (orgId) => {
                     isProjectManager: assignedProjects.some(p => p.role === 'manager' || p.role === 'project_manager' || p.role === 'team_lead'),
                     assignedProjects: assignedProjects, // Export projects array directly
                     department_display: departmentNameDisplay,
-                    status: 'Active',
+                    status: emp.is_active === false ? 'Inactive' : 'Active',
+                    is_active: emp.is_active !== false,
                     availability: availability,
                     task: currentTask,
                     lastActive: lastActive,

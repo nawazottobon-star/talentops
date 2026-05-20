@@ -50,6 +50,7 @@ export const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({ isOpen, on
         total_leaves_balance: 0,
         is_paid: true,
         stipend: '',
+        is_active: true,
     });
     const [projectRole, setProjectRole] = useState('employee');
     const [originalSalary, setOriginalSalary] = useState<any>(null);
@@ -83,6 +84,7 @@ export const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({ isOpen, on
                 total_leaves_balance: employee.total_leaves_balance || 0,
                 is_paid: true,
                 stipend: '',
+                is_active: employee.is_active !== false,
             });
         }
     }, [isOpen, employee, orgId]);
@@ -108,11 +110,11 @@ export const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({ isOpen, on
         try {
             const { data: profile, error } = await supabase
                 .from('profiles')
-                .select('department, team_id, join_date, job_title, employment_type, monthly_leave_quota, total_leaves_balance, is_paid')
+                .select('department, team_id, join_date, job_title, employment_type, monthly_leave_quota, total_leaves_balance, is_paid, is_active')
                 .eq('id', employee.id)
                 .eq('org_id', orgId)
                 .single();
-
+ 
             if (profile) {
                 setFormData(prev => ({
                     ...prev,
@@ -123,6 +125,7 @@ export const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({ isOpen, on
                     monthly_leave_quota: profile.monthly_leave_quota || 1,
                     total_leaves_balance: profile.total_leaves_balance || 0,
                     is_paid: profile.is_paid !== undefined ? profile.is_paid : true,
+                    is_active: profile.is_active !== false,
                 }));
             }
         } catch (err) {
@@ -275,6 +278,7 @@ export const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({ isOpen, on
                     org_id: orgId,
                     team_id: selectedProjects[0] || null,
                     is_paid: formData.is_paid,
+                    is_active: formData.is_active,
                 })
                 .eq('id', employee.id);
 
@@ -577,6 +581,28 @@ export const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({ isOpen, on
                                 <option value="employee">Employee</option>
                                 <option value="manager">Manager</option>
                                 <option value="executive">Executive</option>
+                            </select>
+                        </div>
+ 
+                        {/* Active Status */}
+                        <div>
+                            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', fontWeight: 500 }}>
+                                Active Status
+                            </label>
+                            <select
+                                value={formData.is_active !== false ? 'true' : 'false'}
+                                onChange={(e) => setFormData({ ...formData, is_active: e.target.value === 'true' })}
+                                style={{
+                                    width: '100%',
+                                    padding: '10px',
+                                    borderRadius: '8px',
+                                    border: '1px solid var(--border)',
+                                    backgroundColor: 'var(--background)',
+                                    color: 'var(--text-primary)',
+                                }}
+                            >
+                                <option value="true">🟢 Active Personnel</option>
+                                <option value="false">🔴 Left Organization</option>
                             </select>
                         </div>
 

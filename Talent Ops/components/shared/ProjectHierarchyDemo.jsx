@@ -85,6 +85,7 @@ const ProjectHierarchyDemo = ({ isEditingEnabled = false }) => {
                 .from('profiles')
                 .select('*')
                 .eq('org_id', orgId)
+                .eq('is_active', true)
                 .order('full_name');
 
             if (profilesError) throw profilesError;

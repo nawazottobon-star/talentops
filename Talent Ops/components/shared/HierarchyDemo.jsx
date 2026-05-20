@@ -68,6 +68,7 @@ const HierarchyDemo = () => {
                 .from('profiles')
                 .select('*')
                 .eq('org_id', orgId)
+                .eq('is_active', true)
                 .order('full_name');
 
             if (profiles) {

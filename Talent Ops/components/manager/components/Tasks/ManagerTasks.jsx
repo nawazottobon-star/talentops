@@ -317,12 +317,13 @@ const ManagerTasks = () => {
 
     const fetchEmployees = async () => {
         if (!teamId) return;
-        // Only fetch employees of this team
+        // Only fetch active employees of this team
         const { data } = await supabase
             .from('profiles')
             .select('id, full_name, email, role, team_id')
-            .eq('team_id', teamId);
-
+            .eq('team_id', teamId)
+            .eq('is_active', true);
+ 
         if (data) setEmployeesList(data);
     };
 

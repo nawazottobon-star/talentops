@@ -10,7 +10,7 @@ export default defineConfig(({ mode }) => {
       host: '0.0.0.0',
       proxy: {
         '/api/chatbot': {
-          target: process.env.VITE_CHATBOT_URL || 'http://localhost:8035',
+          target: env.VITE_CHATBOT_API_URL ? env.VITE_CHATBOT_API_URL.replace('/api/chatbot/query', '') : 'http://localhost:8036',
           changeOrigin: true,
           secure: false,
         }

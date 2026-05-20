@@ -87,6 +87,7 @@ const PayslipsPage = ({ userRole, userId, addToast, orgId }) => {
                 .from('profiles')
                 .select('id, full_name, email, role, employment_type')
                 .eq('org_id', orgId)
+                .eq('is_active', true)
                 .order('full_name');
 
             if (data) {

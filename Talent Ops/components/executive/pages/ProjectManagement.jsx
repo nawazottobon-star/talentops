@@ -89,6 +89,7 @@ const ProjectManagement = ({ addToast = () => { } }) => {
                 .from('profiles')
                 .select('id, full_name, email, role')
                 .eq('org_id', orgId)
+                .eq('is_active', true)
                 .order('full_name');
             if (error) throw error;
             setAllUsers(data || []);
@@ -101,11 +102,12 @@ const ProjectManagement = ({ addToast = () => { } }) => {
         try {
             const { data, error } = await supabase
                 .from('project_members')
-                .select('*, profiles:user_id(id, full_name, email)')
+                .select('*, profiles:user_id(id, full_name, email, is_active)')
                 .eq('project_id', projectId)
                 .eq('org_id', orgId);
             if (error) throw error;
-            setProjectMembers(data || []);
+            const activeMembers = (data || []).filter(m => m.profiles && m.profiles.is_active !== false);
+            setProjectMembers(activeMembers);
         } catch (error) {
             console.error('Error fetching members:', error);
         }

@@ -37,7 +37,7 @@ export const UserProvider = ({ children }) => {
                     // 2. Fetch profile (Name, Role, Org)
                     const { data: profile, error: profileError } = await supabase
                         .from('profiles')
-                        .select('full_name, email, role, org_id, team_id')
+                        .select('full_name, email, role, org_id, team_id, is_active')
                         .eq('id', user.id)
                         .single();
 
@@ -46,6 +46,17 @@ export const UserProvider = ({ children }) => {
                         setUserName(user.email || 'User');
                         setUserRole('User');
                     } else if (profile) {
+                        if (profile.is_active === false) {
+                            console.warn('Deactivated account attempted access. Signing out...');
+                            await supabase.auth.signOut();
+                            setUserName('Guest');
+                            setUserRole('Guest');
+                            setUserId(null);
+                            setOrgId(null);
+                            setTeamId(null);
+                            setLoading(false);
+                            return;
+                        }
                         setUserName(profile.full_name || profile.email || 'User');
                         setUserRole(profile.role || 'User');
                         setOrgId(profile.org_id);

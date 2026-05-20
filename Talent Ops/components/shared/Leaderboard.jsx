@@ -47,19 +47,21 @@ const Leaderboard = ({ orgId }) => {
             const { data: users, error: userError } = await supabase
                 .from('profiles') // Assuming 'profiles' table has names
                 .select('id, full_name, avatar_url')
-                .in('id', userIds);
+                .in('id', userIds)
+                .eq('is_active', true);
 
             if (userError) throw userError;
 
             // Merge Data
             const merged = currentSnapshots.map(snap => {
                 const user = users?.find(u => u.id === snap.employee_id);
+                if (!user) return null;
                 return {
                     ...snap,
-                    name: user?.full_name || 'Unknown User',
-                    avatar: user?.avatar_url
+                    name: user.full_name || 'Unknown User',
+                    avatar: user.avatar_url
                 };
-            }).sort((a, b) => a.rank - b.rank);
+            }).filter(Boolean).sort((a, b) => a.rank - b.rank);
 
             setRankings(merged);
 
