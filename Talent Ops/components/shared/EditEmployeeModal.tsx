@@ -978,7 +978,7 @@ export const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({ isOpen, on
                                     </label>
                                     <input
                                         type="number"
-                                        required={currentUserRole === 'executive'}
+                                        required={currentUserRole === 'executive' && formData.is_active}
                                         min={0}
                                         value={formData.basic_salary}
                                         onChange={(e) => setFormData({ ...formData, basic_salary: e.target.value })}
@@ -1003,7 +1003,7 @@ export const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({ isOpen, on
                                     </label>
                                     <input
                                         type="number"
-                                        required={currentUserRole === 'executive'}
+                                        required={currentUserRole === 'executive' && formData.is_active}
                                         min={0}
                                         value={formData.hra}
                                         onChange={(e) => setFormData({ ...formData, hra: e.target.value })}
