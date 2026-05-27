@@ -17,6 +17,8 @@ import {
     BarChart3
 } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
+import UserAvatar from './UserAvatar';
+
 
 const AttendanceLogsPage = () => {
     // State
@@ -773,23 +775,11 @@ const AttendanceLogsPage = () => {
                                                     justifyContent: 'center',
                                                     boxShadow: '0 2px 8px rgba(34, 197, 94, 0.3)'
                                                 }}>
-                                                    <div style={{
-                                                        width: '46px',
-                                                        height: '46px',
-                                                        borderRadius: '50%',
-                                                        backgroundColor: '#fff',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        color: '#22c55e',
-                                                        fontWeight: 700,
-                                                        fontSize: '1rem',
-                                                        backgroundImage: emp.avatar_url ? `url(${emp.avatar_url})` : 'none',
-                                                        backgroundSize: 'cover',
-                                                        backgroundPosition: 'center'
-                                                    }}>
-                                                        {!emp.avatar_url && getEmployeeInitials(emp)}
-                                                    </div>
+                                                    <UserAvatar
+                                                        user={{ name: emp.full_name || emp.email, avatar_url: emp.avatar_url }}
+                                                        size={46}
+                                                        style={{ color: '#22c55e', fontWeight: 700 }}
+                                                    />
                                                 </div>
                                                 <div>
                                                     <div style={{ fontWeight: 600, fontSize: '1rem', color: '#0f172a' }}>
@@ -1247,24 +1237,11 @@ const AttendanceLogsPage = () => {
                                                 alignItems: 'center',
                                                 justifyContent: 'center'
                                             }}>
-                                                <div style={{
-                                                    width: '68px',
-                                                    height: '68px',
-                                                    borderRadius: '50%',
-                                                    backgroundColor: '#fff',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    fontSize: '1.4rem',
-                                                    fontWeight: 700,
-                                                    color: ringColor,
-                                                    backgroundImage: emp.avatar_url ? `url(${emp.avatar_url})` : 'none',
-                                                    backgroundSize: 'cover',
-                                                    backgroundPosition: 'center',
-                                                    border: '1px solid #f1f5f9'
-                                                }}>
-                                                    {!emp.avatar_url && getEmployeeInitials(emp)}
-                                                </div>
+                                                <UserAvatar
+                                                    user={{ name: emp.full_name || emp.email, avatar_url: emp.avatar_url }}
+                                                    size={68}
+                                                    style={{ fontSize: '1.4rem', color: ringColor, fontWeight: 700, border: '1px solid #f1f5f9' }}
+                                                />
                                             </div>
                                         </div>
 

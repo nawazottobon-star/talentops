@@ -1,5 +1,6 @@
 import React from 'react';
 import { X, Mail, Phone, MapPin, Calendar, Briefcase, User, TrendingUp, Layers, CheckCircle2, DollarSign, ShieldCheck, Info, IndianRupee } from 'lucide-react';
+import UserAvatar from './UserAvatar';
 
 const EmployeeDetailsModal = ({ 
     selectedEmployee, 
@@ -115,24 +116,16 @@ const EmployeeDetailsModal = ({
                     alignItems: 'flex-start'
                 }}>
                     <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
-                        <div style={{ 
-                            width: '100px', 
-                            height: '100px', 
-                            borderRadius: '30px', 
-                            backgroundColor: '#f1f5f9', 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            justifyContent: 'center', 
-                            overflow: 'hidden',
-                            border: '4px solid white',
-                            boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)'
-                        }}>
-                            {selectedEmployee.avatar_url ? (
-                                <img src={selectedEmployee.avatar_url} alt={selectedEmployee.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                            ) : (
-                                <span style={{ fontSize: '2.5rem', fontWeight: '900', color: '#94a3b8' }}>{selectedEmployee.name.charAt(0)}</span>
-                            )}
-                        </div>
+                        <UserAvatar
+                            user={{ full_name: selectedEmployee.name, avatar_url: selectedEmployee.avatar_url }}
+                            size={92}
+                            style={{ 
+                                borderRadius: '30px', 
+                                border: '4px solid white',
+                                boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)',
+                                background: '#f1f5f9'
+                            }}
+                        />
                         <div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
                                 <h3 style={{ fontSize: '2rem', fontWeight: '900', color: '#1e293b', margin: 0, letterSpacing: '-0.02em' }}>{selectedEmployee.name}</h3>

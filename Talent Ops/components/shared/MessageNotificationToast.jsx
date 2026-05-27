@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Send, MessageCircle, User } from 'lucide-react';
+import UserAvatar from './UserAvatar';
 import './MessageNotificationToast.css';
 
 const MessageNotificationToast = ({
@@ -96,17 +97,11 @@ const MessageNotificationToast = ({
             {/* Header */}
             <div className="toast-header">
                 <div className="toast-sender">
-                    {message.avatar_url ? (
-                        <img
-                            src={message.avatar_url}
-                            alt={message.sender_name}
-                            className="toast-avatar"
-                        />
-                    ) : (
-                        <div className="toast-avatar-placeholder">
-                            <User size={16} />
-                        </div>
-                    )}
+                    <UserAvatar
+                        user={{ name: message.sender_name, avatar_url: message.avatar_url }}
+                        size={32}
+                        style={{ flexShrink: 0 }}
+                    />
                     <div className="toast-sender-info">
                         <span className="toast-sender-name">{message.sender_name || 'Unknown'}</span>
                         <span className="toast-time">Just now</span>

@@ -18,6 +18,8 @@ import {
     Calendar
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import UserAvatar from '../shared/UserAvatar';
+
 
 const TeamReviewsPage = () => {
     const navigate = useNavigate();
@@ -346,13 +348,10 @@ const TeamReviewsPage = () => {
                             >
                                 <div className="flex items-start justify-between mb-2">
                                     <div className="flex items-center gap-3">
-                                        {emp.avatar_url ? (
-                                            <img src={emp.avatar_url} alt={emp.full_name} className="w-10 h-10 rounded-full object-cover" />
-                                        ) : (
-                                            <div className="w-10 h-10 rounded-full bg-violet-100 flex items-center justify-center text-accent-violet font-bold">
-                                                {emp.full_name?.charAt(0)}
-                                            </div>
-                                        )}
+                                        <UserAvatar
+                                            user={{ name: emp.full_name, avatar_url: emp.avatar_url }}
+                                            size={40}
+                                        />
                                         <div>
                                             <h3 className="font-medium text-ink">{emp.full_name}</h3>
                                             <p className="text-xs text-graphite-light">{emp.job_title || 'Employee'}</p>

@@ -25,6 +25,8 @@ import LeavesFeature from '../../shared/features/LeavesFeature';
 import ApplyLeaveModal from '../../shared/Leaves/ApplyLeaveModal';
 import LeaveDetailsModal from '../../shared/Leaves/LeaveDetailsModal';
 import PayslipsPage from '../../shared/PayslipsPage';
+import UserAvatar from '../../shared/UserAvatar';
+
 
 
 const ModulePage = ({ title, type }) => {
@@ -192,17 +194,12 @@ const ModulePage = ({ title, type }) => {
                 {
                     header: 'Team Member Name', accessor: 'name', render: (row) => (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            {row.avatar_url ? (
-                                <img
-                                    src={row.avatar_url}
-                                    alt={row.name}
-                                    style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover', border: '1px solid #e2e8f0' }}
-                                />
-                            ) : (
-                                <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: 'bold' }}>
-                                    {row.name.charAt(0)}
-                                </div>
-                            )}
+                            <UserAvatar
+                                user={{ name: row.name, avatar_url: row.avatar_url }}
+                                size={32}
+                                style={{ border: '1px solid #e2e8f0' }}
+                            />
+
                             <div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                     <p style={{ fontWeight: 500 }}>{row.name}</p>
@@ -602,13 +599,11 @@ const ModulePage = ({ title, type }) => {
                             <div style={{ padding: '32px' }}>
                                 {/* Profile Section */}
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '32px' }}>
-                                    <div style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem', fontWeight: 'bold', color: '#075985', overflow: 'hidden' }}>
-                                        {selectedEmployee.avatar_url ? (
-                                            <img src={selectedEmployee.avatar_url} alt={selectedEmployee.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                        ) : (
-                                            selectedEmployee.name.charAt(0)
-                                        )}
-                                    </div>
+                                    <UserAvatar
+                                        user={{ name: selectedEmployee.name, avatar_url: selectedEmployee.avatar_url }}
+                                        size={80}
+                                        style={{ fontSize: '2rem', border: '1px solid #e2e8f0' }}
+                                    />
                                     <div style={{ flex: 1 }}>
                                         <h4 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '4px' }}>{selectedEmployee.name}</h4>
                                         <p style={{ color: 'var(--text-secondary)', fontSize: '1rem', marginBottom: '8px' }}>{selectedEmployee.role}</p>

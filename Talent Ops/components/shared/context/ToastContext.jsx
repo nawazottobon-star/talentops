@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { X, CheckCircle, Info, AlertCircle, Send, User } from 'lucide-react';
+import UserAvatar from '../UserAvatar';
 
 const ToastContext = createContext();
 
@@ -63,25 +64,11 @@ const ToastItem = ({ toast, removeToast }) => {
             >
                 {/* Header: Avatar + Name + Close */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div style={{
-                        width: '32px',
-                        height: '32px',
-                        borderRadius: '50%',
-                        backgroundColor: '#8b5cf6',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        overflow: 'hidden',
-                        flexShrink: 0
-                    }}>
-                        {toast.sender?.avatar_url ? (
-                            <img src={toast.sender.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        ) : (
-                            <span style={{ fontSize: '12px', fontWeight: 'bold' }}>
-                                {toast.sender?.name?.[0]?.toUpperCase() || <User size={16} />}
-                            </span>
-                        )}
-                    </div>
+                    <UserAvatar
+                        user={{ name: toast.sender?.name, avatar_url: toast.sender?.avatar_url }}
+                        size={32}
+                        style={{ backgroundColor: '#8b5cf6', color: 'white' }}
+                    />
 
                     <div style={{ flex: 1, overflow: 'hidden' }}>
                         <div style={{

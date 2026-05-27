@@ -3,6 +3,8 @@ import { supabase } from '../../lib/supabaseClient';
 import { Trophy, Search, TrendingUp, Medal, Download, Filter, Calendar } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useUser } from '../shared/context/UserContext';
+import UserAvatar from '../shared/UserAvatar';
+
 
 const FullRankingPage = () => {
     const { orgId } = useUser();
@@ -243,10 +245,10 @@ const FullRankingPage = () => {
                                             </td>
                                             <td className="p-4">
                                                 <div className="flex items-center gap-3">
-                                                    <img
-                                                        src={entry.avatar_url || `https://ui-avatars.com/api/?name=${entry.full_name}&background=random`}
-                                                        alt={entry.full_name}
-                                                        className="w-10 h-10 rounded-full object-cover border border-mist"
+                                                    <UserAvatar
+                                                        user={{ name: entry.full_name, avatar_url: entry.avatar_url }}
+                                                        size={40}
+                                                        style={{ border: '1px solid var(--border)' }}
                                                     />
                                                     <div>
                                                         <div className="font-medium text-ink">{entry.full_name}</div>

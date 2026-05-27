@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Search, Filter, Grid, List as ListIcon, Activity, Eye, Edit, Briefcase, Users, ChevronRight, LayoutGrid } from 'lucide-react';
+import UserAvatar from '../UserAvatar';
 
 const EmployeesFeature = ({ employees, type, title, onAction }) => {
     const [searchTerm, setSearchTerm] = useState('');
@@ -248,13 +249,11 @@ const EmployeesFeature = ({ employees, type, title, onAction }) => {
                             {/* Profile Header */}
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                 <div style={{ display: 'flex', gap: '16px', alignItems: 'center', minWidth: 0, flex: 1 }}>
-                                    <div style={{ width: '56px', height: '56px', borderRadius: '18px', background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', border: '1px solid #e2e8f0', flexShrink: 0 }}>
-                                        {emp.avatar_url ? (
-                                            <img src={emp.avatar_url} alt={emp.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                        ) : (
-                                            <span style={{ fontSize: '1.2rem', fontWeight: '800', color: '#64748b' }}>{emp.name.charAt(0)}</span>
-                                        )}
-                                    </div>
+                                    <UserAvatar
+                                        user={{ name: emp.name, avatar_url: emp.avatar_url }}
+                                        size={54}
+                                        style={{ borderRadius: '18px', border: '1px solid #e2e8f0' }}
+                                    />
                                     <div style={{ minWidth: 0, flex: 1 }}>
                                         <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: '#0f172a', marginBottom: '2px', letterSpacing: '-0.02em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                             {emp.name}
@@ -422,27 +421,12 @@ const EmployeesFeature = ({ employees, type, title, onAction }) => {
                             onClick={() => type === 'workforce' ? onAction('View Employee', emp) : onAction('View Status', emp)}
                         >
                             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                                <div style={{
-                                    width: '44px',
-                                    height: '44px',
-                                    borderRadius: '14px',
-                                    background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    overflow: 'hidden',
-                                    border: '1px solid #e2e8f0',
-                                    position: 'relative'
-                                }}>
-                                    {emp.avatar_url ? (
-                                        <img src={emp.avatar_url} alt={emp.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                    ) : (
-                                        <span style={{ fontSize: '1rem', fontWeight: '800', color: '#64748b' }}>{emp.name.charAt(0)}</span>
-                                    )}
-                                    {type === 'status' && (
-                                        <div style={{ position: 'absolute', bottom: 0, right: 0, width: '12px', height: '12px', borderRadius: '50%', backgroundColor: emp.availability === 'Online' ? '#22c55e' : '#cbd5e1', border: '2px solid white' }}></div>
-                                    )}
-                                </div>
+                                <UserAvatar
+                                    user={{ name: emp.name, avatar_url: emp.avatar_url, status: emp.availability === 'Online' ? 'online' : 'offline' }}
+                                    size={42}
+                                    showStatus={type === 'status'}
+                                    style={{ borderRadius: '14px', border: '1px solid #e2e8f0' }}
+                                />
                                 <div style={{ overflow: 'hidden' }}>
                                     <h4 style={{ fontSize: '1rem', fontWeight: '700', color: '#0f172a', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                         {emp.name}

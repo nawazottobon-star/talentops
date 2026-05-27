@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Mail, Phone, MapPin, Folder, ChevronRight, User, Plus, Trash2, Edit2, Search, Check, RotateCcw, AlertCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
+import UserAvatar from './UserAvatar';
 
 import { useProject } from '../employee/context/ProjectContext';
 
@@ -310,22 +311,11 @@ const ProjectHierarchyDemo = ({ isEditingEnabled = false }) => {
                     boxShadow: `0 4px 12px -2px ${color}20`,
                     border: `1.2px solid ${color}15`
                 }}>
-                    <div style={{
-                        width: '100%',
-                        height: '100%',
-                        borderRadius: '12px',
-                        overflow: 'hidden',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        backgroundColor: '#f8fafc'
-                    }}>
-                        {member?.avatar_url ? (
-                            <img src={member.avatar_url} alt={title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        ) : (
-                            <div style={{ color }}>{Icon ? <Icon size={18} /> : <span style={{ fontWeight: '800', fontSize: '1.2rem' }}>{title?.charAt(0)}</span>}</div>
-                        )}
-                    </div>
+                    <UserAvatar
+                        user={member || { full_name: title, avatar_url: member?.avatar_url }}
+                        size={42}
+                        style={{ borderRadius: '12px', background: '#f8fafc', color }}
+                    />
                 </div>
 
                 <div>
@@ -344,13 +334,11 @@ const ProjectHierarchyDemo = ({ isEditingEnabled = false }) => {
                 <div style={{ backgroundColor: 'white', borderRadius: '16px', width: '400px', padding: '32px', position: 'relative' }} onClick={e => e.stopPropagation()}>
                     <button onClick={onClose} style={{ position: 'absolute', top: '16px', right: '16px', border: 'none', background: 'none', cursor: 'pointer' }}><X size={20} /></button>
                     <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-                        <div style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: '#7c3aed', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem', margin: '0 auto 16px', overflow: 'hidden' }}>
-                            {employee.avatar_url ? (
-                                <img src={employee.avatar_url} alt={employee.full_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                            ) : (
-                                employee.full_name?.charAt(0)
-                            )}
-                        </div>
+                        <UserAvatar
+                            user={employee}
+                            size={80}
+                            style={{ margin: '0 auto 16px' }}
+                        />
                         <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>{employee.full_name}</h3>
                         <p style={{ color: '#64748b' }}>{employee.role}</p>
                     </div>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, FileText, Clock, User, AlertCircle, Send } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
+import UserAvatar from './UserAvatar';
 
 /**
  * TaskNotesModal - Modal for adding and viewing immutable task notes
@@ -309,29 +310,11 @@ const TaskNotesModal = ({
                                     }}
                                 >
                                     {/* Avatar */}
-                                    <div style={{
-                                        width: '36px',
-                                        height: '36px',
-                                        borderRadius: '50%',
-                                        background: 'linear-gradient(135deg, #8b5cf6, #6366f1)',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        color: 'white',
-                                        fontSize: '0.8rem',
-                                        fontWeight: 600,
-                                        flexShrink: 0
-                                    }}>
-                                        {note.profiles?.avatar_url ? (
-                                            <img
-                                                src={note.profiles.avatar_url}
-                                                alt=""
-                                                style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
-                                            />
-                                        ) : (
-                                            getInitials(note.profiles?.full_name)
-                                        )}
-                                    </div>
+                                    <UserAvatar
+                                        user={note.profiles}
+                                        size={36}
+                                        style={{ background: 'linear-gradient(135deg, #8b5cf6, #6366f1)', color: 'white' }}
+                                    />
 
                                     {/* Content */}
                                     <div style={{ flex: 1, minWidth: 0 }}>

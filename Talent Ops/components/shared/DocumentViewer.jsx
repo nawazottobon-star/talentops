@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { FileText, Image, File, AlertCircle, Download, ExternalLink, X, Eye, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Maximize2, Minimize2 } from 'lucide-react';
+import { supabase } from '../../lib/supabaseClient';
 
 /**
  * DocumentViewer Component
@@ -13,28 +14,88 @@ const DocumentViewer = ({ url, fileName, onClose }) => {
     const [activeIndex, setActiveIndex] = useState(0);
     const [imageZoom, setImageZoom] = useState(1);
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const [resolvedUrls, setResolvedUrls] = useState([]);
+    const [loadingUrls, setLoadingUrls] = useState(true);
 
-    // Normalize URL: handle string, JSON string, or array
-    let urls = [];
-    if (Array.isArray(url)) {
-        urls = url;
-    } else if (typeof url === 'string') {
-        const trimmedUrl = url.trim();
-        if (trimmedUrl.startsWith('[') && trimmedUrl.endsWith(']')) {
-            try {
-                urls = JSON.parse(trimmedUrl);
-            } catch (e) {
-                urls = [trimmedUrl];
-            }
-        } else if (trimmedUrl.includes(',') && trimmedUrl.includes('http')) {
-            urls = trimmedUrl.split(',').map(u => u.trim()).filter(Boolean);
-        } else if (trimmedUrl) {
-            urls = [trimmedUrl];
+    // Helper: dynamic client-side Supabase URL signing
+    const getSignedUrlIfPrivate = async (publicUrl) => {
+        if (!publicUrl || typeof publicUrl !== 'string') return publicUrl;
+        
+        const supabaseUrlMarker = '/storage/v1/object/public/';
+        if (!publicUrl.includes(supabaseUrlMarker)) {
+            return publicUrl;
         }
-    }
 
-    const currentUrl = urls[activeIndex];
-    const totalFiles = urls.length;
+        try {
+            const parts = publicUrl.split(supabaseUrlMarker);
+            if (parts.length < 2) return publicUrl;
+
+            const bucketAndPath = parts[1];
+            const firstSlashIndex = bucketAndPath.indexOf('/');
+            if (firstSlashIndex === -1) return publicUrl;
+
+            const bucket = bucketAndPath.substring(0, firstSlashIndex);
+            const encodedPath = bucketAndPath.substring(firstSlashIndex + 1);
+            const path = decodeURIComponent(encodedPath);
+
+            const { data, error: signError } = await supabase.storage
+                .from(bucket)
+                .createSignedUrl(path, 3600); // 1 hour expiry
+
+            if (signError) {
+                console.warn('Failed to generate signed URL (non-fatal):', signError.message);
+                return publicUrl;
+            }
+
+            return data.signedUrl;
+        } catch (e) {
+            console.error('Error creating signed URL:', e);
+            return publicUrl;
+        }
+    };
+
+    // Asynchronously resolve all URLs on mount/update
+    useEffect(() => {
+        let active = true;
+        const resolveAll = async () => {
+            setLoadingUrls(true);
+            let normalized = [];
+            if (Array.isArray(url)) {
+                normalized = url;
+            } else if (typeof url === 'string') {
+                const trimmedUrl = url.trim();
+                if (trimmedUrl.startsWith('[') && trimmedUrl.endsWith(']')) {
+                    try {
+                        normalized = JSON.parse(trimmedUrl);
+                    } catch (e) {
+                        normalized = [trimmedUrl];
+                    }
+                } else if (trimmedUrl.includes(',') && trimmedUrl.includes('http')) {
+                    normalized = trimmedUrl.split(',').map(u => u.trim()).filter(Boolean);
+                } else if (trimmedUrl) {
+                    normalized = [trimmedUrl];
+                }
+            }
+
+            const resolved = await Promise.all(
+                normalized.map(async (u) => {
+                    const cleanUrl = u.replace(/[\[\]"]/g, '').trim();
+                    return await getSignedUrlIfPrivate(cleanUrl);
+                })
+            );
+
+            if (active) {
+                setResolvedUrls(resolved);
+                setLoadingUrls(false);
+            }
+        };
+
+        resolveAll();
+        return () => { active = false; };
+    }, [url]);
+
+    const currentUrl = resolvedUrls[activeIndex];
+    const totalFiles = resolvedUrls.length;
     const currentFileName = totalFiles > 1 ? `${fileName || 'Document'} (${activeIndex + 1}/${totalFiles})` : (fileName || 'Document');
 
     // ESC key handler
@@ -52,7 +113,34 @@ const DocumentViewer = ({ url, fileName, onClose }) => {
         return () => window.removeEventListener('keydown', handleKey);
     }, [activeIndex, totalFiles, onClose]);
 
-    if (!currentUrl || urls.length === 0) return null;
+    if (loadingUrls) {
+        return (
+            <div
+                style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    zIndex: 3000, backdropFilter: 'blur(8px)'
+                }}
+            >
+                <style>{`
+                    @keyframes docViewerSpin { to { transform: rotate(360deg); } }
+                `}</style>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', color: 'white' }}>
+                    <div style={{
+                        width: '40px', height: '40px', border: `3px solid rgba(255,255,255,0.3)`,
+                        borderTopColor: '#3b82f6', borderRadius: '50%',
+                        animation: 'docViewerSpin 0.8s linear infinite'
+                    }} />
+                    <span style={{ fontSize: '0.9rem', fontWeight: 500 }}>
+                        Securing connection...
+                    </span>
+                </div>
+            </div>
+        );
+    }
+
+    if (!currentUrl || resolvedUrls.length === 0) return null;
 
     // Detect file type
     const getFileType = (fileUrl) => {
@@ -250,23 +338,24 @@ const DocumentViewer = ({ url, fileName, onClose }) => {
             );
         }
 
-        if (fileType === 'pdf') {
-            // Use Google Docs Viewer for reliable inline PDF rendering
-            // NOTE: This only works for public URLs. 
-            const googleDocsUrl = `https://docs.google.com/gview?url=${encodeURIComponent(currentUrl)}&embedded=true`;
+        if (fileType === 'pdf' || fileType === 'text') {
+            // Render PDFs and Text files natively in the browser's built-in viewer via iframe.
+            // This is secure, works locally (on localhost), handles private/signed URLs, and displays the content inline.
             return (
                 <div style={{ width: '100%', height: '100%', position: 'relative', backgroundColor: 'var(--background)' }}>
                     {loadingOverlay}
                     <iframe
                         key={currentUrl}
-                        src={googleDocsUrl}
-                        style={{ width: '100%', height: '100%', border: 'none' }}
-                        title="PDF Preview"
+                        src={currentUrl}
+                        style={{ width: '100%', height: '100%', border: 'none', backgroundColor: 'white' }}
+                        title="Document Preview"
                         onLoad={() => {
-                            // If it stays "loading" for too long, it might be a private URL issue
-                            setTimeout(() => setLoading(false), 2000);
+                            setLoading(false);
                         }}
-                        onError={() => { setError(true); setLoading(false); }}
+                        onError={() => {
+                            setError(true);
+                            setLoading(false);
+                        }}
                     />
                 </div>
             );
@@ -277,22 +366,67 @@ const DocumentViewer = ({ url, fileName, onClose }) => {
         if (['word', 'excel', 'powerpoint'].includes(fileType)) {
             const officeUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(currentUrl)}`;
             return (
-                <div style={{ width: '100%', height: '100%', position: 'relative', backgroundColor: 'var(--background)' }}>
-                    {loadingOverlay}
-                    <iframe
-                        key={currentUrl}
-                        src={officeUrl}
-                        style={{ width: '100%', height: '100%', border: 'none' }}
-                        title="Document Preview"
-                        onLoad={() => {
-                            setTimeout(() => setLoading(false), 2500);
-                        }}
-                        onError={() => {
-                            // Fallback — try Google Docs viewer
-                            setError(true);
-                            setLoading(false);
-                        }}
-                    />
+                <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--background)' }}>
+                    {/* Inline Helper Banner for Third-Party Preview constraints */}
+                    <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '12px',
+                        padding: '10px 20px',
+                        backgroundColor: 'var(--surface)',
+                        borderBottom: '1px solid var(--border)',
+                        color: 'var(--text-secondary)',
+                        fontSize: '0.85rem',
+                        fontWeight: 500
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <AlertCircle size={16} color="#3b82f6" />
+                            <span>
+                                <strong>Preview Tip:</strong> If the preview is blank or says 'File not found' (due to local server or security settings), you can access it directly.
+                            </span>
+                        </div>
+                        <div style={{ display: 'flex', gap: '10px', flexShrink: 0 }}>
+                            <button 
+                                onClick={handleDownloadBtnClick}
+                                style={{
+                                    background: 'none', border: 'none', color: '#3b82f6',
+                                    fontWeight: 600, cursor: 'pointer', textDecoration: 'underline',
+                                    fontSize: '0.85rem', padding: 0
+                                }}
+                            >
+                                Download
+                            </button>
+                            <span style={{ color: 'var(--border)' }}>|</span>
+                            <a 
+                                href={currentUrl} target="_blank" rel="noopener noreferrer"
+                                style={{
+                                    color: '#3b82f6', fontWeight: 600, textDecoration: 'underline',
+                                    fontSize: '0.85rem'
+                                }}
+                            >
+                                Open in Tab
+                            </a>
+                        </div>
+                    </div>
+
+                    <div style={{ flex: 1, position: 'relative', width: '100%' }}>
+                        {loadingOverlay}
+                        <iframe
+                            key={currentUrl}
+                            src={officeUrl}
+                            style={{ width: '100%', height: '100%', border: 'none' }}
+                            title="Document Preview"
+                            onLoad={() => {
+                                setTimeout(() => setLoading(false), 2500);
+                            }}
+                            onError={() => {
+                                // Fallback — try Google Docs viewer
+                                setError(true);
+                                setLoading(false);
+                            }}
+                        />
+                    </div>
                 </div>
             );
         }

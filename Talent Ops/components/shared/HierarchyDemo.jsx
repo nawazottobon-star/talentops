@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Mail, Phone, MapPin, ZoomIn, ZoomOut, RotateCcw, Shield, Users, Briefcase, Activity, ChevronDown, ChevronRight, Info } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
+import UserAvatar from './UserAvatar';
 
 const HierarchyDemo = () => {
     const [orgId, setOrgId] = useState(null);
@@ -170,22 +171,11 @@ const HierarchyDemo = () => {
                     boxShadow: `0 4px 10px -2px ${color}18`,
                     border: `1.5px solid ${color}20`
                 }}>
-                    <div style={{
-                        width: '100%',
-                        height: '100%',
-                        borderRadius: '11px',
-                        overflow: 'hidden',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        backgroundColor: '#f8fafc'
-                    }}>
-                        {data.avatar_url ? (
-                            <img src={data.avatar_url} alt={data.full_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        ) : (
-                            <span style={{ fontSize: compact ? '1rem' : '1.2rem', fontWeight: '800', color: color }}>{data.full_name?.charAt(0)}</span>
-                        )}
-                    </div>
+                    <UserAvatar
+                        user={data}
+                        size={compact ? 34 : 42}
+                        style={{ borderRadius: '11px', background: '#f8fafc', color }}
+                    />
                 </div>
 
                 <div style={{ minWidth: 0, width: '100%' }}>
@@ -550,15 +540,11 @@ const HierarchyDemo = () => {
                                     <X size={16} />
                                 </button>
                                 <div style={{ position: 'absolute', bottom: '-32px', left: '32px', width: '72px', height: '72px', borderRadius: '20px', backgroundColor: 'white', padding: '4px', boxShadow: '0 8px 20px rgba(0,0,0,0.1)' }}>
-                                    <div style={{ width: '100%', height: '100%', borderRadius: '16px', overflow: 'hidden', backgroundColor: '#f1f5f9' }}>
-                                        {selectedEmployee.avatar_url ? (
-                                            <img src={selectedEmployee.avatar_url} alt={selectedEmployee.full_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                        ) : (
-                                            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.8rem', fontWeight: '800', color: '#64748b' }}>
-                                                {selectedEmployee.full_name?.charAt(0)}
-                                            </div>
-                                        )}
-                                    </div>
+                                    <UserAvatar
+                                        user={selectedEmployee}
+                                        size={64}
+                                        style={{ borderRadius: '16px', background: '#f1f5f9' }}
+                                    />
                                 </div>
                             </div>
                             <div style={{ padding: '44px 32px 28px' }}>

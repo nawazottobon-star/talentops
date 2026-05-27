@@ -1,28 +1,70 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../../lib/supabaseClient';
 
-const UserAvatar = ({ user, size = 40, showStatus = false, isTyping = false }) => {
+const UserAvatar = ({ user, size = 40, showStatus = false, isTyping = false, style = {} }) => {
     // Handle cases where user object might have different shapes (e.g. from profiles join vs flat object)
-    const avatarUrl = user?.avatar_url || user?.profiles?.avatar_url;
-    const fullName = user?.full_name || user?.profiles?.full_name || user?.email || user?.profiles?.email || '?';
+    const avatarUrl = user?.avatar_url || user?.profiles?.avatar_url || user?.avatar;
+    const fullName = user?.full_name || user?.profiles?.full_name || user?.name || user?.email || user?.profiles?.email || '?';
 
     // Safely get initials
     const initials = (fullName[0] || '?').toUpperCase();
 
-    // Generate a consistent background color based on the name if no avatar
-    // Simple hash function for color stability
-    const getColor = (str) => {
-        let hash = 0;
-        for (let i = 0; i < str.length; i++) {
-            hash = str.charCodeAt(i) + ((hash << 5) - hash);
-        }
-        const c = (hash & 0x00FFFFFF).toString(16).toUpperCase();
-        return '#' + '00000'.substring(0, 6 - c.length) + c;
-    };
+    const [resolvedUrl, setResolvedUrl] = useState('');
+    const [hasError, setHasError] = useState(false);
 
-    // Use a default gray/slate if we don't want random colors, or use the gradient from the original designs
-    // The original design often used explicit colors or gray. Let's stick to the gray/slate default 
-    // found in most of the app for now, or allow a prop.
-    // Found in ChatWindow: background: '#e2e8f0' (slate-200) or 'linear-gradient...' for admins
+    useEffect(() => {
+        let active = true;
+        setHasError(false); // Reset error state when avatar changes
+        const resolve = async () => {
+            if (!avatarUrl || typeof avatarUrl !== 'string') {
+                if (active) setResolvedUrl('');
+                return;
+            }
+
+            const supabaseUrlMarker = '/storage/v1/object/public/';
+            if (!avatarUrl.includes(supabaseUrlMarker)) {
+                if (active) setResolvedUrl(avatarUrl);
+                return;
+            }
+
+            try {
+                const parts = avatarUrl.split(supabaseUrlMarker);
+                if (parts.length < 2) {
+                    if (active) setResolvedUrl(avatarUrl);
+                    return;
+                }
+
+                const bucketAndPath = parts[1];
+                const firstSlashIndex = bucketAndPath.indexOf('/');
+                if (firstSlashIndex === -1) {
+                    if (active) setResolvedUrl(avatarUrl);
+                    return;
+                }
+
+                const bucket = bucketAndPath.substring(0, firstSlashIndex);
+                const encodedPath = bucketAndPath.substring(firstSlashIndex + 1);
+                const path = decodeURIComponent(encodedPath);
+
+                const { data, error } = await supabase.storage
+                    .from(bucket)
+                    .createSignedUrl(path, 3600); // 1 hour expiry
+
+                if (error) {
+                    console.warn('Failed to sign avatar URL (non-fatal):', error.message);
+                    if (active) setResolvedUrl(avatarUrl);
+                    return;
+                }
+
+                if (active) setResolvedUrl(data.signedUrl);
+            } catch (e) {
+                console.error('Error signing avatar URL:', e);
+                if (active) setResolvedUrl(avatarUrl);
+            }
+        };
+
+        resolve();
+        return () => { active = false; };
+    }, [avatarUrl]);
 
     return (
         <div
@@ -42,13 +84,15 @@ const UserAvatar = ({ user, size = 40, showStatus = false, isTyping = false }) =
                 color: user?.is_admin ? 'white' : '#64748b',
                 overflow: 'hidden',
                 position: 'relative',
-                flexShrink: 0
+                flexShrink: 0,
+                ...style
             }}
         >
-            {avatarUrl ? (
+            {resolvedUrl && !hasError ? (
                 <img
-                    src={avatarUrl}
+                    src={resolvedUrl}
                     alt={fullName}
+                    onError={() => setHasError(true)}
                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 />
             ) : (

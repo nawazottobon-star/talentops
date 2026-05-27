@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Trophy, Medal, Award, TrendingUp, Users } from 'lucide-react';
 import { supabase } from '../../../lib/supabaseClient';
+import UserAvatar from './UserAvatar';
 
 const Leaderboard = ({ orgId }) => {
     const [period, setPeriod] = useState('week'); // 'week' | 'month'
@@ -164,12 +165,7 @@ const Leaderboard = ({ orgId }) => {
 
                                 {/* User Info */}
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                    {user.avatar ?
-                                        <img src={user.avatar} style={{ width: '32px', height: '32px', borderRadius: '50%' }} /> :
-                                        <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#64748b' }}>{user.name.charAt(0)}</span>
-                                        </div>
-                                    }
+                                    <UserAvatar user={user} size={32} />
                                     <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#334155' }}>{user.name}</span>
                                 </div>
 

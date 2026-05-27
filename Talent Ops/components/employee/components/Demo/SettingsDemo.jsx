@@ -4,6 +4,61 @@ import { supabase } from '../../../../lib/supabaseClient';
 
 const SettingsDemo = () => {
     const [userProfile, setUserProfile] = useState(null);
+    const [resolvedAvatarUrl, setResolvedAvatarUrl] = useState('');
+    const [avatarError, setAvatarError] = useState(false);
+
+    useEffect(() => {
+        let active = true;
+        setAvatarError(false); // Reset error state on change
+        const resolve = async () => {
+            if (!userProfile?.avatar_url) {
+                setResolvedAvatarUrl('');
+                return;
+            }
+            
+            const rawUrl = userProfile.avatar_url;
+            const supabaseUrlMarker = '/storage/v1/object/public/';
+            if (!rawUrl.includes(supabaseUrlMarker)) {
+                setResolvedAvatarUrl(rawUrl);
+                return;
+            }
+
+            try {
+                const parts = rawUrl.split(supabaseUrlMarker);
+                if (parts.length < 2) {
+                    setResolvedAvatarUrl(rawUrl);
+                    return;
+                }
+
+                const bucketAndPath = parts[1];
+                const firstSlashIndex = bucketAndPath.indexOf('/');
+                if (firstSlashIndex === -1) {
+                    setResolvedAvatarUrl(rawUrl);
+                    return;
+                }
+
+                const bucket = bucketAndPath.substring(0, firstSlashIndex);
+                const encodedPath = bucketAndPath.substring(firstSlashIndex + 1);
+                const path = decodeURIComponent(encodedPath);
+
+                const { data, error } = await supabase.storage
+                    .from(bucket)
+                    .createSignedUrl(path, 3600);
+
+                if (!error && data) {
+                    if (active) setResolvedAvatarUrl(data.signedUrl);
+                } else {
+                    if (active) setResolvedAvatarUrl(rawUrl);
+                }
+            } catch (e) {
+                if (active) setResolvedAvatarUrl(rawUrl);
+            }
+        };
+
+        resolve();
+        return () => { active = false; };
+    }, [userProfile?.avatar_url]);
+
     const [teamName, setTeamName] = useState('');
     const [departmentName, setDepartmentName] = useState('');
     const [projectRoles, setProjectRoles] = useState([]);
@@ -357,10 +412,11 @@ const SettingsDemo = () => {
                             alignItems: 'center',
                             justifyContent: 'center'
                         }}>
-                            {userProfile?.avatar_url ? (
+                            {resolvedAvatarUrl && !avatarError ? (
                                 <img
-                                    src={userProfile.avatar_url}
+                                    src={resolvedAvatarUrl}
                                     alt="Profile"
+                                    onError={() => setAvatarError(true)}
                                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                                 />
                             ) : (
