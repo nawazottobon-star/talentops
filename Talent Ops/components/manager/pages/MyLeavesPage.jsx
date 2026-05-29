@@ -254,6 +254,28 @@ const MyLeavesPage = () => {
             return;
         }
 
+        const activeStartDate = useSpecificDates ? datesToApply[0] : leaveFormData.startDate;
+
+        // 7-day advance notice validation (except Sick Leave)
+        const selectedType = leaveFormData.leaveType || selectedCategory;
+        const isSickLeave = (selectedType || '').toLowerCase().includes('sick');
+
+        if (!isSickLeave) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            const minAdvanceDate = new Date(today);
+            minAdvanceDate.setDate(today.getDate() + 7);
+            
+            const requestStart = new Date(activeStartDate);
+            requestStart.setHours(0, 0, 0, 0);
+            
+            if (requestStart < minAdvanceDate) {
+                addToast('All leave requests (except Sick Leave) must be submitted at least 7 days in advance.', 'error');
+                return;
+            }
+        }
+
         // Calculate total weekdays requested
         const weekdaysRequested = useSpecificDates
             ? datesToApply.filter(date => isWeekday(date)).length

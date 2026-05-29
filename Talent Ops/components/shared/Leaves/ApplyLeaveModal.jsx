@@ -106,6 +106,28 @@ const ApplyLeaveModal = ({ onClose, onSuccess }) => {
 
             const activeStartDate = selectedDates.length > 0 ? selectedDates[0] : leaveFormData.startDate;
             const activeEndDate = selectedDates.length > 0 ? selectedDates[selectedDates.length - 1] : leaveFormData.endDate;
+
+            // 7-day advance notice validation (except Sick Leave)
+            const selectedType = leaveFormData.leaveType || selectedCategory;
+            const isSickLeave = (selectedType || '').toLowerCase().includes('sick');
+
+            if (!isSickLeave) {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                
+                const minAdvanceDate = new Date(today);
+                minAdvanceDate.setDate(today.getDate() + 7);
+                
+                const requestStart = new Date(activeStartDate);
+                requestStart.setHours(0, 0, 0, 0);
+                
+                if (requestStart < minAdvanceDate) {
+                    addToast('All leave requests (except Sick Leave) must be submitted at least 7 days in advance.', 'error');
+                    setIsSubmitting(false);
+                    return;
+                }
+            }
+
             const effectiveLeaveType = isCasualExhausted ? 'Loss of Pay' : leaveFormData.leaveType;
 
             const { error: insertError } = await supabase

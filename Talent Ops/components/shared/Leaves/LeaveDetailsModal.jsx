@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Briefcase, Activity } from 'lucide-react';
 import { supabase } from '../../../lib/supabaseClient';
+import { calculateRemainingLeaves } from '../../../utils/payrollCalculations';
 
 export const LeaveDetailsModal = ({ 
     selectedLeaveRequest, 
@@ -42,23 +43,12 @@ export const LeaveDetailsModal = ({
                 
                 setPendingTasks(pendingTasksData || []);
 
-                // Fetch dynamic monthly balance
-                const startOfMonth = new Date();
-                startOfMonth.setDate(1);
-                startOfMonth.setHours(0,0,0,0);
-                const startOfMonthStr = startOfMonth.toISOString().split('T')[0];
+                // Fetch dynamic annual remaining balance, subtracting pending leaves of this year
+                const currentYear = new Date().getFullYear();
+                const firstOfYear = `${currentYear}-01-01`;
+                const lastOfYear = `${currentYear}-12-31`;
 
-                const { data: monthApproved } = await supabase
-                    .from('leaves')
-                    .select('duration_weekdays')
-                    .eq('employee_id', selectedLeaveRequest.employee_id)
-                    .eq('org_id', orgId)
-                    .eq('status', 'approved')
-                    .gte('from_date', startOfMonthStr);
-
-                const alreadyTaken = monthApproved?.reduce((sum, l) => sum + (l.duration_weekdays || 0), 0) || 0;
-                
-                // Fetch other pending leaves (excluding the current one) to show impact
+                // Fetch other pending leaves (excluding the current one) in the current year to show impact
                 const { data: pending } = await supabase
                     .from('leaves')
                     .select('duration_weekdays')
@@ -66,12 +56,12 @@ export const LeaveDetailsModal = ({
                     .eq('org_id', orgId)
                     .eq('status', 'pending')
                     .neq('id', selectedLeaveRequest.id)
-                    .gte('from_date', startOfMonthStr);
+                    .gte('from_date', firstOfYear)
+                    .lte('from_date', lastOfYear);
 
-                const monthlyQuota = 1;
-                const currentMonthlyBalance = Math.max(0, monthlyQuota - alreadyTaken);
+                const remainingBalance = await calculateRemainingLeaves(selectedLeaveRequest.employee_id, orgId);
                 
-                setEvalBalance(currentMonthlyBalance);
+                setEvalBalance(remainingBalance);
                 setEvalPendingPaid(pending?.reduce((sum, l) => sum + (l.duration_weekdays || 0), 0) || 0);
 
             } catch (error) {
@@ -255,7 +245,7 @@ export const LeaveDetailsModal = ({
 
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
                             <div style={{ backgroundColor: 'white', padding: '16px', borderRadius: '14px', border: '1px solid #e0f2fe' }}>
-                                <p style={{ fontSize: '0.75rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', marginBottom: '8px' }}>LEAVE BALANCE (This Month)</p>
+                                <p style={{ fontSize: '0.75rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', marginBottom: '8px' }}>AVAILABLE CL BALANCE</p>
                                 <div style={{ fontSize: '1.5rem', fontWeight: '800', color: '#0f172a' }}>{evalBalance} Days</div>
                             </div>
 

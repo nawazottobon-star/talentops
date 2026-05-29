@@ -10,7 +10,9 @@ import {
     calculateLOPAmount,
     calculateNetSalary,
     formatMonthYear,
-    checkPayrollExists
+    checkPayrollExists,
+    getHolidayWeekdaysCount,
+    calculateApprovedLOPDays
 } from '../../utils/payrollCalculations';
 import { X, FileText, CheckSquare, Square, Calculator, AlertTriangle, Search, MessageSquare, Info, Activity, Calendar, ArrowLeft, ArrowRight, User, Briefcase, CheckCircle2, Trash2, Plus, AlertCircle } from 'lucide-react';
 import './payslip/PayslipFormModal.css';
@@ -162,14 +164,16 @@ const PayrollFormModal = ({ isOpen, onClose, onSuccess, orgId }) => {
                     .single();
 
                 // Calculate working days (M-F pool) and total calendar days (salary divisor)
-                const workingDaysPool = getWorkingDaysInMonth(parseInt(selectedMonth), selectedYear);
+                const workingDaysPoolRaw = getWorkingDaysInMonth(parseInt(selectedMonth), selectedYear);
+                const holidayWeekdays = await getHolidayWeekdaysCount(parseInt(selectedMonth), selectedYear, orgId);
+                const workingDaysPool = Math.max(0, workingDaysPoolRaw - holidayWeekdays);
                 const totalCalendarDays = getDaysInMonth(parseInt(selectedMonth), selectedYear);
 
                 const presentDays = await calculatePresentDays(employeeId, parseInt(selectedMonth), selectedYear, orgId);
                 const leaveDays = await calculateApprovedLeaveDays(employeeId, parseInt(selectedMonth), selectedYear, orgId);
 
-                // Calculate LOP using the Mon-Fri working days pool
-                const lopDays = calculateLOPDays(workingDaysPool, presentDays, leaveDays);
+                // Calculate LOP strictly based on leave requests
+                const lopDays = await calculateApprovedLOPDays(employeeId, parseInt(selectedMonth), selectedYear, orgId);
 
                 // Use total calendar days as divisor for dynamic per-day amount
                 const lopAmount = calculateLOPAmount(financeData.basic_salary, financeData.hra, financeData.allowances, totalCalendarDays, lopDays);

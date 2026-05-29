@@ -8,6 +8,7 @@ import { useToast } from '../context/ToastContext';
 import { useUser } from '../context/UserContext';
 import { supabase } from '../../../lib/supabaseClient';
 import NotesTile from '../../shared/NotesTile';
+import { calculateRemainingLeaves } from '../../../utils/payrollCalculations';
 
 import AttendanceTracker from '../components/Dashboard/AttendanceTracker';
 
@@ -341,27 +342,13 @@ const DashboardHome = () => {
 
                 const absentDays = Math.max(0, workingDays - presentDays);
 
-                // Fetch dynamic monthly balance
-                const startOfMonth = new Date();
-                startOfMonth.setDate(1);
-                startOfMonth.setHours(0,0,0,0);
-                const startOfMonthStr = startOfMonth.toISOString().split('T')[0];
-
-                const { data: monthApproved } = await supabase
-                    .from('leaves')
-                    .select('duration_weekdays')
-                    .eq('employee_id', user.id)
-                    .eq('org_id', profile.org_id)
-                    .eq('status', 'approved')
-                    .gte('from_date', startOfMonthStr);
-
-                const alreadyTaken = monthApproved?.reduce((sum, l) => sum + (l.duration_weekdays || 0), 0) || 0;
-                const monthlyQuota = 1;
+                // Fetch dynamic remaining annual balance
+                const remainingBalance = await calculateRemainingLeaves(user.id, profile.org_id);
 
                 setAttendanceStats({
                     present: presentDays,
                     absent: absentDays,
-                    leaveBalance: Math.max(0, monthlyQuota - alreadyTaken)
+                    leaveBalance: remainingBalance
                 });
 
             } catch (error) {

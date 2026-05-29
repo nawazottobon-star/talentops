@@ -34,7 +34,7 @@ export const useLeaves = (orgId, userId, viewMode = 'personal') => {
     const [leaveStats, setLeaveStats] = useState({
         monthlyUsed: 0,
         yearlyUsed: 0,
-        monthlyQuota: 12,
+        monthlyQuota: 1,
         annualQuota: 12,
         leaveYear: new Date().getFullYear()
     });
@@ -163,7 +163,7 @@ export const useLeaves = (orgId, userId, viewMode = 'personal') => {
                 setLeaveStats({
                     monthlyUsed: tempMonthlyUsed,
                     yearlyUsed: tempYearlyUsed,
-                    monthlyQuota: annualQuota,
+                    monthlyQuota: 1,
                     annualQuota,
                     leaveYear: currentYear
                 });

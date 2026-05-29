@@ -33,6 +33,7 @@ import { useEmployees } from '../../shared/hooks/useEmployees';
 import EmployeesFeature from '../../shared/features/EmployeesFeature';
 import { useLeaves } from '../../shared/hooks/useLeaves';
 import LeavesFeature from '../../shared/features/LeavesFeature';
+import { calculateRemainingLeaves } from '../../../utils/payrollCalculations';
 
 
 const ModulePage = ({ title, type }) => {
@@ -476,10 +477,11 @@ const ModulePage = ({ title, type }) => {
                         .gte('from_date', startOfMonth.toISOString().split('T')[0]);
 
                     const alreadyTaken = monthApproved?.reduce((sum, l) => sum + (l.duration_weekdays || 0), 0) || 0;
-                    const monthlyQuota = 1;
-                    const availableInMonth = Math.max(0, monthlyQuota - alreadyTaken);
+                    
+                    // Dynamically calculate the employee's YTD remaining leaves balance
+                    const remainingBalance = await calculateRemainingLeaves(item.employee_id, orgId);
 
-                    finalPaid = Math.max(0, Math.min(totalRequestedDays, availableInMonth));
+                    finalPaid = Math.max(0, Math.min(totalRequestedDays, remainingBalance));
                     finalLop = totalRequestedDays - finalPaid;
 
                     const { error: leaveUpdateError } = await supabase
@@ -664,6 +666,27 @@ const ModulePage = ({ title, type }) => {
             return;
         }
 
+        // 7-day advance notice validation (except Sick Leave)
+        const selectedType = leaveFormData.leaveType;
+        const isSickLeave = (selectedType || '').toLowerCase().includes('sick');
+
+        if (!isSickLeave) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            const minAdvanceDate = new Date(today);
+            minAdvanceDate.setDate(today.getDate() + 7);
+            
+            const activeStartDate = useSpecificDates ? datesToApply[0] : leaveFormData.startDate;
+            const requestStart = new Date(activeStartDate);
+            requestStart.setHours(0, 0, 0, 0);
+            
+            if (requestStart < minAdvanceDate) {
+                addToast('All leave requests (except Sick Leave) must be submitted at least 7 days in advance.', 'error');
+                return;
+            }
+        }
+
         // Calculate duration
         const start = new Date(leaveFormData.startDate);
         const end = new Date(leaveFormData.endDate);
@@ -686,33 +709,23 @@ const ModulePage = ({ title, type }) => {
         // Insert leave request(s)
         const submitToDb = async () => {
             try {
-                // Calculate initial Paid/LOP split for application record
-                // Calculate dynamic monthly balance
-                const startOfMonth = new Date();
-                startOfMonth.setDate(1);
-                startOfMonth.setHours(0,0,0,0);
-                const startOfMonthStr = startOfMonth.toISOString().split('T')[0];
+                // Calculate dynamic annual remaining balance, subtracting pending leaves of this year
+                const currentYear = new Date().getFullYear();
+                const firstOfYear = `${currentYear}-01-01`;
+                const lastOfYear = `${currentYear}-12-31`;
 
-                const { data: monthApproved } = await supabase
-                    .from('leaves')
-                    .select('duration_weekdays')
-                    .eq('employee_id', userId)
-                    .eq('org_id', orgId)
-                    .eq('status', 'approved')
-                    .gte('from_date', startOfMonthStr);
-
-                const alreadyTaken = monthApproved?.reduce((sum, l) => sum + (l.duration_weekdays || 0), 0) || 0;
-                
                 const { data: pendingLeaves } = await supabase
                     .from('leaves')
                     .select('duration_weekdays')
                     .eq('employee_id', userId)
                     .eq('status', 'pending')
-                    .gte('from_date', startOfMonthStr);
+                    .gte('from_date', firstOfYear)
+                    .lte('from_date', lastOfYear);
 
                 const pendingPaid = pendingLeaves?.reduce((sum, l) => sum + (l.duration_weekdays || 0), 0) || 0;
-                const monthlyQuota = 1;
-                const effectiveBalance = Math.max(0, monthlyQuota - alreadyTaken - pendingPaid);
+                
+                const remainingBalance = await calculateRemainingLeaves(userId, orgId);
+                const effectiveBalance = Math.max(0, remainingBalance - pendingPaid);
 
                 const leaveReason = `${leaveFormData.leaveType}: ${leaveFormData.reason}` +
                     (useSpecificDates ? ` (Dates: ${datesToApply.join(', ')})` : '');

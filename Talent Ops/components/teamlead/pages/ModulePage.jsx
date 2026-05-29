@@ -37,8 +37,8 @@ import { useLeaves } from '../../shared/hooks/useLeaves';
 import LeavesFeature from '../../shared/features/LeavesFeature';
 import ApplyLeaveModal from '../../shared/Leaves/ApplyLeaveModal';
 import LeaveDetailsModal from '../../shared/Leaves/LeaveDetailsModal';
-import { Users, Briefcase as BriefcaseIcon, Mail as MailIcon, Phone as PhoneIcon, Calendar as CalendarIcon, MapPin as MapPinIcon, Search, Filter, MoreVertical, Check, ChevronDown, Clock } from 'lucide-react';
-
+import { Users, Briefcase as BriefcaseIcon, Mail as MailIcon, Phone as PhoneIcon, Calendar as CalendarIcon, MapPin as MailIcon2, Search, Filter, MoreVertical, Check, ChevronDown, Clock } from 'lucide-react';
+import { calculateRemainingLeaves } from '../../../utils/payrollCalculations';
 
 const ModulePage = ({ title, type }) => {
     const { addToast } = useToast();
@@ -114,10 +114,10 @@ const ModulePage = ({ title, type }) => {
                         .gte('from_date', startOfMonth.toISOString().split('T')[0]);
 
                     const alreadyTaken = monthApproved?.reduce((sum, l) => sum + (l.duration_weekdays || 0), 0) || 0;
-                    const monthlyQuota = 1;
-                    const availableInMonth = Math.max(0, monthlyQuota - alreadyTaken);
+                    // Dynamically calculate the employee's YTD remaining leaves balance
+                    const remainingBalance = await calculateRemainingLeaves(item.employee_id, orgId);
 
-                    finalPaid = Math.max(0, Math.min(totalRequestedDays, availableInMonth));
+                    finalPaid = Math.max(0, Math.min(totalRequestedDays, remainingBalance));
                     finalLop = totalRequestedDays - finalPaid;
 
                     const { error: leaveUpdateError } = await supabase
