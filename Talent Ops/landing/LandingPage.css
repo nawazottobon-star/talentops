@@ -32,25 +32,37 @@
 .landing-page-wrapper { scroll-behavior: smooth; }
 .landing-page-wrapper { font-family: var(--sans); color: var(--gray-800); background: var(--white); line-height: 1.6; }
 
-  /* NAV */
+  /* NAV - Floating Glassmorphic Pill */
 .landing-page-wrapper nav {
-    position: sticky; top: 0; z-index: 100;
-    background: rgba(255,255,255,0.95);
-    backdrop-filter: blur(12px);
-    border-bottom: 1px solid var(--gray-200);
-    padding: 0 2rem;
-    height: 64px;
-    display: flex; align-items: center; justify-content: space-between;
+    position: absolute; 
+    top: 24px; 
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90%;
+    max-width: 1100px;
+    z-index: 9999;
+    background: rgba(13, 27, 62, 0.45); /* Dark tinted glassmorphism */
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 100px;
+    padding: 0 24px 0 32px;
+    height: 68px;
+    display: flex; 
+    align-items: center; 
+    justify-content: space-between;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+    transition: all 0.3s ease;
   }
-.landing-page-wrapper .nav-logo { font-family: var(--sans); font-weight: 600; font-size: 1.2rem; color: var(--navy); text-decoration: none; display: flex; align-items: center; gap: 8px; }
+.landing-page-wrapper .nav-logo { font-family: var(--sans); font-weight: 700; font-size: 1.25rem; color: var(--white); text-decoration: none; display: flex; align-items: center; letter-spacing: -0.02em; }
 .landing-page-wrapper .nav-logo span { color: var(--blue-brand); }
-.landing-page-wrapper .nav-links { display: flex; align-items: center; gap: 2rem; }
-.landing-page-wrapper .nav-links a { text-decoration: none; color: var(--gray-600); font-size: 0.9rem; font-weight: 500; transition: color .2s; }
-.landing-page-wrapper .nav-links a:hover { color: var(--navy); }
-.landing-page-wrapper .nav-cta { display: flex; gap: 10px; align-items: center; }
+.landing-page-wrapper .nav-links { display: flex; align-items: center; gap: 2.5rem; }
+.landing-page-wrapper .nav-links a { text-decoration: none; color: rgba(255,255,255,0.75); font-size: 0.9rem; font-weight: 500; transition: color .2s; }
+.landing-page-wrapper .nav-links a:hover { color: var(--white); }
+.landing-page-wrapper .nav-cta { display: flex; gap: 12px; align-items: center; }
 .landing-page-wrapper .btn { display: inline-flex; align-items: center; gap: 6px; padding: 10px 20px; border-radius: var(--radius-md); font-family: var(--sans); font-weight: 500; font-size: 0.875rem; cursor: pointer; transition: all .2s; text-decoration: none; border: none; }
-.landing-page-wrapper .btn-ghost { background: transparent; color: var(--gray-600); border: 1.5px solid var(--gray-200); }
-.landing-page-wrapper .btn-ghost:hover { border-color: var(--blue-brand); color: var(--blue-brand); }
+.landing-page-wrapper .btn-ghost { background: transparent; color: var(--white); border: 1.5px solid rgba(255,255,255,0.5); }
+.landing-page-wrapper .btn-ghost:hover { border-color: var(--white); color: var(--white); background: rgba(255,255,255,0.1); }
 .landing-page-wrapper .btn-primary { background: var(--blue-brand); color: var(--white); }
 .landing-page-wrapper .btn-primary:hover { background: #1558d4; transform: translateY(-1px); box-shadow: 0 4px 14px rgba(27,107,245,.35); }
 .landing-page-wrapper .btn-white { background: var(--white); color: var(--navy); font-weight: 600; }
@@ -193,6 +205,26 @@
     border-radius: var(--radius-lg); padding: 28px 20px; text-align: center;
     transition: all .25s; cursor: pointer;
   }
+.landing-page-wrapper .industry-card-bg {
+    background-size: cover;
+    background-position: center;
+    position: relative;
+    z-index: 1;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+.landing-page-wrapper .industry-card-bg::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    /* Gradient: clearer at the top for the image, solid white at the bottom for text readability */
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0.9) 45%, #ffffff 80%);
+    z-index: -1;
+    transition: all .3s ease;
+    border-radius: calc(var(--radius-lg) - 1.5px);
+}
+.landing-page-wrapper .industry-card-bg:hover::before {
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.8) 50%, #ffffff 90%);
+}
 .landing-page-wrapper .industry-card:hover { border-color: var(--blue-brand); box-shadow: var(--shadow-md); transform: translateY(-2px); }
 .landing-page-wrapper .industry-icon { font-size: 2rem; margin-bottom: 12px; }
 .landing-page-wrapper .industry-card h3 { font-size: 0.95rem; font-weight: 600; color: var(--navy); margin-bottom: 6px; }
@@ -232,7 +264,7 @@
   /* CTA */
 .landing-page-wrapper .cta-section {
     background: linear-gradient(135deg, var(--blue-brand) 0%, #0A4DBF 100%);
-    padding: 96px 2rem; text-align: center;
+    padding: 56px 2rem; text-align: center;
   }
 .landing-page-wrapper .cta-section h2 { font-family: var(--serif); font-size: clamp(2rem, 4vw, 3rem); color: var(--white); margin-bottom: 16px; }
 .landing-page-wrapper .cta-section p { color: rgba(255,255,255,0.7); font-size: 1rem; margin-bottom: 36px; max-width: 480px; margin-left: auto; margin-right: auto; }

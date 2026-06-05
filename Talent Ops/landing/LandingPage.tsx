@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import GridScan from './components/GridScan';
 import ProblemDiagnostic from './components/ProblemDiagnostic';
@@ -7,6 +7,19 @@ import './LandingPage.css';
 
 export function LandingPage() {
   const [activeModule, setActiveModule] = useState('tasks');
+  const [autoRotate, setAutoRotate] = useState(true);
+
+  useEffect(() => {
+    if (!autoRotate) return;
+    const modules = ['tasks', 'people', 'finance', 'hiring', 'comms'];
+    const timer = setInterval(() => {
+      setActiveModule(prev => {
+        const nextIndex = (modules.indexOf(prev) + 1) % modules.length;
+        return modules[nextIndex];
+      });
+    }, 2500); // 2.5 seconds feels a bit more natural for reading headers
+    return () => clearInterval(timer);
+  }, [autoRotate]);
 
   return (
     <div className="landing-page-wrapper">
@@ -46,11 +59,11 @@ export function LandingPage() {
         />
         <div className="container" style={{ position: 'relative', zIndex: 1 }}>
           <div className="hero-badge"><span className="dot"></span> AI-Powered Workforce Operations</div>
-          <h1>Stop Managing Talent <em>by Instinct.</em><br />Start Operating with Intelligence.</h1>
-          <p>TalentOps combines AI automation, human operators, and expert guidance to run your entire workforce — hiring, tasks, payroll, attendance, and more.</p>
+          <h1>Don't Buy More HR Software.<br /><em>Hire an Entire Ops Team.</em></h1>
+          <p>We don't just sell you a system. TalentOps provides the AI automation and the human experts to run your hiring, payroll, and daily tasks for you.</p>
           <div className="hero-btns">
             <Link to="/wizard" className="btn btn-primary btn-lg">Partner with an AI-Powered Ops Team</Link>
-            <a href="#modules" className="btn btn-outline-white btn-lg">See the Platform</a>
+            <a href="#how-it-works" className="btn btn-outline-white btn-lg">View Our Process</a>
           </div>
           <div className="hero-trust">
             <span>✓ No large HR team needed</span>
@@ -73,16 +86,16 @@ export function LandingPage() {
       {/**/}
       <section className="modules-section" id="modules">
         <div className="container">
-          <div className="section-tag">Platform Modules</div>
-          <h2 className="section-title">Every Workforce Function. One System.</h2>
-          <p className="section-sub">Real modules built for how your team actually operates — not abstract feature lists.</p>
+          <div className="section-tag">What We Handle For You</div>
+          <h2 className="section-title">Every Workforce Outcome. One Team.</h2>
+          <p className="section-sub">We don't just give you a dashboard to manage. We handle the heavy lifting across your entire organization.</p>
 
           <div className="module-tabs">
-            <div className={`module-tab ${activeModule === "tasks" ? "active" : ""}`} onClick={() => setActiveModule("tasks")}>Task Management</div>
-            <div className={`module-tab ${activeModule === "people" ? "active" : ""}`} onClick={() => setActiveModule("people")}>People Operations</div>
-            <div className={`module-tab ${activeModule === "finance" ? "active" : ""}`} onClick={() => setActiveModule("finance")}>Finance &amp; Billing</div>
-            <div className={`module-tab ${activeModule === "hiring" ? "active" : ""}`} onClick={() => setActiveModule("hiring")}>Hiring Pipeline</div>
-            <div className={`module-tab ${activeModule === "comms" ? "active" : ""}`} onClick={() => setActiveModule("comms")}>Communications</div>
+            <div className={`module-tab ${activeModule === "tasks" ? "active" : ""}`} onClick={() => { setActiveModule("tasks"); setAutoRotate(false); }}>Task Management</div>
+            <div className={`module-tab ${activeModule === "people" ? "active" : ""}`} onClick={() => { setActiveModule("people"); setAutoRotate(false); }}>People Operations</div>
+            <div className={`module-tab ${activeModule === "finance" ? "active" : ""}`} onClick={() => { setActiveModule("finance"); setAutoRotate(false); }}>Finance &amp; Billing</div>
+            <div className={`module-tab ${activeModule === "hiring" ? "active" : ""}`} onClick={() => { setActiveModule("hiring"); setAutoRotate(false); }}>Hiring Pipeline</div>
+            <div className={`module-tab ${activeModule === "comms" ? "active" : ""}`} onClick={() => { setActiveModule("comms"); setAutoRotate(false); }}>Communications</div>
           </div>
 
           {/**/}
@@ -347,22 +360,22 @@ export function LandingPage() {
             <p className="section-sub">TalentOps is purpose-built for professional services, tech, and knowledge-driven businesses managing complex contractor setups.</p>
           </div>
           <div className="industry-grid">
-            <div className="industry-card">
+            <div className="industry-card industry-card-bg" style={{ backgroundImage: 'url(/images/tech_bg.png)' }}>
               <div className="industry-icon">💻</div>
               <h3>Technology &amp; Software</h3>
               <p>Manage engineers, contractors, and product teams across sprint cycles and project deliverables.</p>
             </div>
-            <div className="industry-card">
+            <div className="industry-card industry-card-bg" style={{ backgroundImage: 'url(/images/legal_bg.png)' }}>
               <div className="industry-icon">⚖️</div>
               <h3>Legal &amp; Consulting</h3>
               <p>Track billable hours, client assignments, and partner utilization across practice areas.</p>
             </div>
-            <div className="industry-card">
+            <div className="industry-card industry-card-bg" style={{ backgroundImage: 'url(/images/medical_bg.png)' }}>
               <div className="industry-icon">🏥</div>
               <h3>Medical &amp; Healthcare</h3>
               <p>Manage shift scheduling, compliance requirements, and multi-location staff operations.</p>
             </div>
-            <div className="industry-card">
+            <div className="industry-card industry-card-bg" style={{ backgroundImage: 'url(/images/startup_bg.png)' }}>
               <div className="industry-icon">📈</div>
               <h3>Scaling Startups</h3>
               <p>Build operational discipline from day one — so your processes scale as fast as your team does.</p>

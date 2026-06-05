@@ -32,8 +32,8 @@ export default function OperationsEngine() {
       <div className="arch-bg-glow"></div>
       <div className="oe-wrap">
         <div className={`arch-header ${visible ? 'oe-in' : ''}`}>
-          <div className="section-tag">The TalentOps Architecture</div>
-          <h2 className="section-title">Three Layers. Zero Gaps.<br/>One Seamless Operations Engine.</h2>
+          <div className="section-tag">Our Operating Model</div>
+          <h2 className="section-title">Three Layers. Zero Gaps.<br/>One Seamless Operations Team.</h2>
           <p className="section-sub">Most software gives you a tool. TalentOps gives you an entire workforce operations team — one that never sleeps, never misses an escalation, and gets smarter every day.</p>
         </div>
         <div className={`arch-diagram ${visible ? 'oe-in' : ''}`}>
@@ -104,15 +104,6 @@ export default function OperationsEngine() {
             </div>
           </div>
           <div className="arch-esc">
-            <span className="esc-title">How it flows</span>
-            <div className="esc-flow" style={{ flexWrap: 'nowrap', overflowX: 'auto' }}>
-              <span className="esc-node ai" style={{ flexShrink: 0 }}>AI Manager</span>
-              <span className="esc-arr" style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>handles routine → exception →</span>
-              <span className="esc-node human" style={{ flexShrink: 0 }}>Human Operator</span>
-              <span className="esc-arr" style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>reviews → complex →</span>
-              <span className="esc-node expert" style={{ flexShrink: 0 }}>Domain Expert</span>
-              <span className="esc-arr" style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>resolves</span>
-            </div>
             <span className="esc-note" style={{ width: '100%', textAlign: 'center', marginTop: '8px', display: 'block' }}>Every operation is covered. Nothing falls through the gaps.</span>
           </div>
         </div>

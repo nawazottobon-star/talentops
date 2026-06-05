@@ -44,12 +44,11 @@ export function Navigation({ isDark = false }: NavigationProps) {
                 <div className="hidden md:flex gap-8">
                     {[
                         { name: 'Problem', href: '/#problem' },
-                        { name: 'Services', href: '/#services' },
-                        { name: 'How It Works', href: '/#approach' },
+                        { name: 'How It Works', href: '/#how-it-works' },
+                        { name: 'Modules', href: '/#modules' },
                         { name: 'Industries', href: '/#industries' },
-                        { name: 'Foundations', href: '/#foundations' },
                         { name: 'Results', href: '/#results' },
-                        { name: 'Pricing', href: '/#pricing' }
+                        { name: 'Pricing', href: '/pricing' }
                     ].map((item) => (
                         <a
                             key={item.name}
@@ -100,13 +99,12 @@ export function Navigation({ isDark = false }: NavigationProps) {
             {isMobileMenuOpen && (
                 <div className="absolute top-full left-0 right-0 bg-white border-b border-[#dadada] flex flex-col p-6 gap-4 md:hidden shadow-xl animate-in fade-in slide-in-from-top-4">
                     {[
-                        { name: 'Problem', href: '#problem' },
-                        { name: 'Services', href: '#services' },
-                        { name: 'How It Works', href: '#approach' },
-                        { name: 'Industries', href: '#industries' },
-                        { name: 'Foundations', href: '#foundations' },
-                        { name: 'Results', href: '#results' },
-                        { name: 'Pricing', href: '#pricing' }
+                        { name: 'Problem', href: '/#problem' },
+                        { name: 'How It Works', href: '/#how-it-works' },
+                        { name: 'Modules', href: '/#modules' },
+                        { name: 'Industries', href: '/#industries' },
+                        { name: 'Results', href: '/#results' },
+                        { name: 'Pricing', href: '/pricing' }
                     ].map((item) => (
                         <a
                             key={item.name}

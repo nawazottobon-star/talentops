@@ -157,7 +157,7 @@ export function ProblemDiagnostic() {
   const activeProblem = active ? problems.find(p => p.id === active) : problems[scanLine];
 
   return (
-    <section className="pd-section">
+    <section className="pd-section" id="problem">
       <div className="pd-container">
 
         {/* Header */}
